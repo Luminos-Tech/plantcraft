@@ -29,7 +29,7 @@ export default function ScanFriendPage() {
       startQRScanning()
     } catch (error) {
       console.error('Failed to access camera:', error)
-      setErrorMsg('Không thể mở camera. Vui lòng cấp quyền camera.')
+      setErrorMsg('Unable to open camera. Please grant camera permissions.')
       setScanState('error')
     }
   }, [])
@@ -107,7 +107,7 @@ export default function ScanFriendPage() {
               setPlantData(data)
               setScanState('detected')
             } else {
-              setErrorMsg('Chủ cây chưa bật chia sẻ công khai. Hãy nhờ họ bật Public Mode!')
+              setErrorMsg('Plant owner hasn\'t enabled public sharing. Ask them to turn on Public Mode!')
               setScanState('error')
             }
           }
@@ -159,9 +159,9 @@ export default function ScanFriendPage() {
     <div className="min-h-full px-4 py-4">
       {/* Header */}
       <div className="mb-4">
-        <h2 className="font-pixel text-xs text-foreground">Quét Cây Bạn Bè</h2>
+        <h2 className="font-pixel text-xs text-foreground">Scan Friend's Plant</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Hướng camera vào mã QR của PlantCraft để xem cây bạn bè trong AR!
+          Point camera at a PlantCraft QR code to see friend's plants in AR!
         </p>
       </div>
 
@@ -191,7 +191,7 @@ export default function ScanFriendPage() {
             {/* Status text */}
             <div className="absolute bottom-4 left-0 right-0 text-center">
               <span className="rounded-sm bg-black/60 px-3 py-1.5 font-pixel text-[8px] text-white">
-                📷 Đang tìm mã QR PlantCraft...
+                📷 Searching for PlantCraft QR...
               </span>
             </div>
           </>
@@ -241,20 +241,20 @@ export default function ScanFriendPage() {
                     color: getHpColor(plantData.hp),
                   }}
                 >
-                  {plantData.hp >= 70 ? 'Khỏe mạnh' : plantData.hp >= 40 ? 'Cần chú ý' : 'Nguy kịch!'}
+                  {plantData.hp >= 70 ? 'Healthy' : plantData.hp >= 40 ? 'Needs Attention' : 'Critical!'}
                 </span>
               </div>
 
               {/* Items count */}
               {plantData.placedItems && plantData.placedItems.length > 0 && (
                 <p className="mt-2 font-pixel text-[8px] text-muted-foreground">
-                  🎨 {plantData.placedItems.length} vật phẩm trang trí
+                  🎨 {plantData.placedItems.length} decorative items
                 </p>
               )}
 
               {/* Last updated */}
               <p className="mt-2 text-[10px] text-muted-foreground">
-                Cập nhật: {new Date(plantData.lastUpdated).toLocaleString('vi-VN')}
+                Updated: {new Date(plantData.lastUpdated).toLocaleString('en-US')}
               </p>
             </div>
 
@@ -262,7 +262,7 @@ export default function ScanFriendPage() {
             <div className="mt-3 flex items-center gap-1.5">
               <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
               <span className="font-pixel text-[8px] text-muted-foreground">
-                Đang theo dõi realtime
+                Tracking realtime
               </span>
             </div>
           </div>
@@ -270,14 +270,14 @@ export default function ScanFriendPage() {
           <div className="flex h-full flex-col items-center justify-center p-6 text-center">
             <span className="text-5xl">❌</span>
             <p className="mt-4 font-pixel text-xs text-foreground">
-              {errorMsg || 'Đã xảy ra lỗi'}
+              {errorMsg || 'An error occurred'}
             </p>
           </div>
         ) : (
           <div className="flex h-full flex-col items-center justify-center text-center">
             <span className="text-5xl">🔍</span>
             <p className="mt-4 font-pixel text-[10px] text-muted-foreground">
-              Nhấn nút bên dưới để bắt đầu quét
+              Tap button below to start scanning
             </p>
           </div>
         )}
@@ -290,7 +290,7 @@ export default function ScanFriendPage() {
             onClick={startCamera}
             className="w-full rounded-sm bg-primary font-pixel text-xs text-primary-foreground hover:bg-primary/90"
           >
-            📷 Bắt đầu quét
+            📷 Start Scan
           </Button>
         )}
 
@@ -300,7 +300,7 @@ export default function ScanFriendPage() {
             onClick={() => { stopCamera(); setScanState('idle') }}
             className="w-full rounded-sm border-2 border-primary font-pixel text-xs"
           >
-            ✕ Hủy
+            ✕ Cancel
           </Button>
         )}
 
@@ -309,26 +309,26 @@ export default function ScanFriendPage() {
             onClick={resetScan}
             className="w-full rounded-sm bg-primary font-pixel text-xs text-primary-foreground hover:bg-primary/90"
           >
-            🔄 Quét cây khác
+            🔄 Scan another plant
           </Button>
         )}
       </div>
 
       {/* Instructions */}
       <div className="mt-6 rounded-sm border border-border bg-secondary/50 p-4">
-        <h3 className="font-pixel text-[10px] text-foreground">Cách sử dụng:</h3>
+        <h3 className="font-pixel text-[10px] text-foreground">How to use:</h3>
         <ul className="mt-2 space-y-1.5 text-xs text-muted-foreground">
           <li className="flex gap-2">
             <span className="text-accent">1.</span>
-            Nhờ bạn mở trang QR của cây trong PlantCraft
+            Ask friend to open their plant's QR page
           </li>
           <li className="flex gap-2">
             <span className="text-accent">2.</span>
-            Hướng camera vào mã QR trên màn hình/giấy in
+            Point camera at the QR code on screen or printed paper
           </li>
           <li className="flex gap-2">
             <span className="text-accent">3.</span>
-            Xem thông tin cây và HP hiển thị realtime!
+            View plant info and HP in realtime!
           </li>
         </ul>
       </div>

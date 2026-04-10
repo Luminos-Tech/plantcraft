@@ -130,16 +130,16 @@ function CameraContent() {
       <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
         <span className="text-4xl">🌿</span>
         <h2 className="mt-4 font-pixel text-sm text-foreground">
-          Chọn một cây
+          Select a plant
         </h2>
         <p className="mt-2 text-center text-sm text-muted-foreground">
-          Vào vườn và nhấn &quot;AR Trang Trí&quot; trên thẻ cây.
+          Go to garden and click &quot;AR Decor&quot; on the plant card.
         </p>
         <button
           onClick={() => router.push('/dashboard')}
           className="mt-6 rounded-sm bg-primary px-6 py-2 font-pixel text-xs text-primary-foreground"
         >
-          Về Vườn
+          Back to Garden
         </button>
       </div>
     )
@@ -172,14 +172,14 @@ function CameraContent() {
           <button
             onClick={(e) => { e.stopPropagation(); waterPlant(plant.id) }}
             className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500/80 text-lg shadow-lg active:scale-95 transition-transform"
-            title="Tưới nước"
+            title="Water"
           >
             💧
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); wipePlant(plant.id) }}
             className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500/80 text-lg shadow-lg active:scale-95 transition-transform"
-            title="Lau lá"
+            title="Wipe leaves"
           >
             🍃
           </button>
@@ -197,7 +197,7 @@ function CameraContent() {
             >
               🚨 {plant.pendingDiagnosis.disease}
               <br />
-              <span className="text-[6px] opacity-80">Nhấn để xem chi tiết</span>
+              <span className="text-[6px] opacity-80">Click for details</span>
             </button>
           </div>
         )}
@@ -210,7 +210,7 @@ function CameraContent() {
               style={{ backdropFilter: 'blur(4px)' }}
             >
               <span className="font-pixel text-xs text-white">
-                👆 Chạm lên cây để đặt vật phẩm
+                👆 Tap on plant to place items
               </span>
             </div>
           </div>
@@ -308,7 +308,7 @@ export default function CameraPage() {
       <div className="flex min-h-screen items-center justify-center bg-black">
         <div className="text-center">
           <span className="text-4xl animate-pulse">📷</span>
-          <p className="mt-2 font-pixel text-xs text-white">Đang mở camera...</p>
+          <p className="mt-2 font-pixel text-xs text-white">Opening camera...</p>
         </div>
       </div>
     }>

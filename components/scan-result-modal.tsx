@@ -33,9 +33,9 @@ export function ScanResultModal({ result, plantId, open, onOpenChange }: ScanRes
 
   const getSeverityLabel = (severity: string) => {
     switch (severity) {
-      case 'mild': return 'Nhẹ'
-      case 'moderate': return 'Trung bình'
-      case 'severe': return 'Nặng'
+      case 'mild': return 'Mild'
+      case 'moderate': return 'Moderate'
+      case 'severe': return 'Severe'
       default: return severity
     }
   }
@@ -57,10 +57,10 @@ export function ScanResultModal({ result, plantId, open, onOpenChange }: ScanRes
             </span>
           </div>
           <DialogTitle className="font-pixel text-sm text-primary">
-            {result.isHealthy ? 'Cây Khỏe Mạnh!' : 'Phát hiện bệnh'}
+            {result.isHealthy ? 'Healthy Plant!' : 'Disease Detected'}
           </DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
-            Độ tin cậy: {Math.round(result.confidence * 100)}%
+            Confidence: {Math.round(result.confidence * 100)}%
           </DialogDescription>
         </DialogHeader>
 
@@ -81,7 +81,7 @@ export function ScanResultModal({ result, plantId, open, onOpenChange }: ScanRes
           {result.treatments && result.treatments.length > 0 && (
             <div className="mt-3">
               <h4 className="font-pixel text-[8px] text-muted-foreground mb-2">
-                💊 Hướng dẫn điều trị:
+                💊 Treatment Steps:
               </h4>
               <ol className="space-y-1.5">
                 {result.treatments.map((step, i) => (
@@ -104,7 +104,7 @@ export function ScanResultModal({ result, plantId, open, onOpenChange }: ScanRes
               onClick={handleCure}
               className="flex-1 rounded-sm bg-accent font-pixel text-[10px] text-accent-foreground hover:bg-accent/90"
             >
-              ✨ Đã chữa khỏi (+100 GC)
+              ✨ Cured (+100 GC)
             </Button>
           )}
           <Button
@@ -116,7 +116,7 @@ export function ScanResultModal({ result, plantId, open, onOpenChange }: ScanRes
                 : 'border-2 border-primary'
             }`}
           >
-            {result.isHealthy ? '🎉 Tuyệt vời!' : 'Đóng'}
+            {result.isHealthy ? '🎉 Awesome!' : 'Close'}
           </Button>
         </div>
       </DialogContent>

@@ -13,6 +13,6 @@ COPY package.json package-lock.json* ./
 # but for a container-only approach:
 # RUN npm install
 
-EXPOSE 6000
+EXPOSE 6001
 
 CMD ["npm", "run", "start"]

@@ -36,17 +36,17 @@ export async function POST(request: NextRequest) {
     }
 
     const systemPrompt = `
-Bạn là chuyên gia chẩn đoán bệnh thực vật.
-Phân tích ảnh lá cây và trả về JSON với cấu trúc sau (KHÔNG có markdown, KHÔNG có backtick):
+You are a plant disease diagnosis expert.
+Analyze the plant leaf image and return JSON with the following structure (NO markdown, NO backticks):
 {
-  "disease": "tên bệnh bằng tiếng Việt, hoặc 'Khỏe mạnh' nếu không có bệnh",
+  "disease": "disease name in English, or 'Healthy' if no disease is found",
   "severity": "mild | moderate | severe",
-  "treatments": ["bước 1", "bước 2", "bước 3"],
+  "treatments": ["step 1", "step 2", "step 3"],
   "confidence": 0.0-1.0,
   "isHealthy": true | false
 }
-Tên cây: ${plantName}.
-Nếu ảnh không phải lá cây, trả về { "disease": "Không phải ảnh lá cây", "severity": "mild", "treatments": ["Vui lòng chụp lại ảnh lá cây"], "confidence": 0, "isHealthy": false }.
+Plant name: ${plantName}.
+If the image is not a plant leaf, return { "disease": "Not a leaf image", "severity": "mild", "treatments": ["Please take a photo of a plant leaf"], "confidence": 0, "isHealthy": false }.
     `.trim()
 
     const response = await fetch(
@@ -97,13 +97,13 @@ Nếu ảnh không phải lá cây, trả về { "disease": "Không phải ảnh
 
     if (error instanceof SyntaxError) {
       return NextResponse.json(
-        { error: 'AI trả về kết quả không hợp lệ. Vui lòng thử lại.' },
+        { error: 'AI returned an invalid result. Please try again.' },
         { status: 500 }
       )
     }
 
     return NextResponse.json(
-      { error: 'Không thể kết nối AI. Vui lòng thử lại sau.' },
+      { error: 'Could not connect to AI. Please try again later.' },
       { status: 500 }
     )
   }
