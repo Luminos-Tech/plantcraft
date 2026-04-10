@@ -21,10 +21,10 @@ export function PlantCard({ plant }: PlantCardProps) {
   }
 
   const getStatus = () => {
-    if (hp === 0) return { text: 'Cần cứu!', emoji: '💀', className: 'bg-destructive text-destructive-foreground' }
-    if (hp < 20) return { text: 'Nguy kịch!', emoji: '🚨', className: 'bg-destructive text-destructive-foreground' }
-    if (hp < 50) return { text: 'Cần tưới', emoji: '💧', className: 'bg-[#FFC107] text-foreground' }
-    return { text: 'Khỏe mạnh', emoji: '✅', className: 'bg-primary text-primary-foreground' }
+    if (hp === 0) return { text: 'Need Help!', emoji: '💀', className: 'bg-destructive text-destructive-foreground' }
+    if (hp < 20) return { text: 'Critical!', emoji: '🚨', className: 'bg-destructive text-destructive-foreground' }
+    if (hp < 50) return { text: 'Thirsty', emoji: '💧', className: 'bg-[#FFC107] text-foreground' }
+    return { text: 'Healthy', emoji: '✅', className: 'bg-primary text-primary-foreground' }
   }
 
   const status = getStatus()
@@ -108,7 +108,7 @@ export function PlantCard({ plant }: PlantCardProps) {
           className="flex-1 font-pixel text-[8px] border-primary hover:bg-primary hover:text-primary-foreground"
           onClick={() => waterPlant(plant.id)}
         >
-          💧 Tưới
+          💧 Water
         </Button>
         <Button
           variant="outline"
@@ -116,7 +116,7 @@ export function PlantCard({ plant }: PlantCardProps) {
           className="font-pixel text-[8px] border-primary hover:bg-primary hover:text-primary-foreground"
           onClick={() => wipePlant(plant.id)}
         >
-          🍃 Lau
+          🍃 Wipe
         </Button>
         <Button
           size="sm"

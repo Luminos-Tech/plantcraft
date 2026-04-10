@@ -172,7 +172,7 @@ export const useGameStore = create<GameState>()(
           ]
         }))
         get().addCareLog(newPlant.id, 'water', 'Plant added')
-        dispatchRewardEvent(rewards.xp, rewards.coins, 'Thêm cây mới')
+        dispatchRewardEvent(rewards.xp, rewards.coins, 'Add new plant')
       },
       
       removePlant: (plantId) => {
@@ -204,7 +204,7 @@ export const useGameStore = create<GameState>()(
           ]
         }))
         get().addCareLog(plantId, 'water')
-        dispatchRewardEvent(rewards.xp, rewards.coins, 'Tưới nước')
+        dispatchRewardEvent(rewards.xp, rewards.coins, 'Watering')
       },
 
       wipePlant: (plantId) => {
@@ -230,7 +230,7 @@ export const useGameStore = create<GameState>()(
           ]
         }))
         get().addCareLog(plantId, 'wipe', 'Wiped leaves')
-        dispatchRewardEvent(rewards.xp, rewards.coins, 'Lau lá')
+        dispatchRewardEvent(rewards.xp, rewards.coins, 'Wiping leaves')
       },
 
       curePlant: (plantId) => {
@@ -256,7 +256,7 @@ export const useGameStore = create<GameState>()(
           ]
         }))
         get().addCareLog(plantId, 'cure', 'Disease cured!')
-        dispatchRewardEvent(rewards.xp, rewards.coins, 'Chữa bệnh thành công')
+        dispatchRewardEvent(rewards.xp, rewards.coins, 'Cured disease')
       },
 
       setPendingDiagnosis: (plantId, diagnosis) => {
@@ -297,7 +297,7 @@ export const useGameStore = create<GameState>()(
             { itemId, purchasedAt: Date.now() },
           ],
         }))
-        dispatchRewardEvent(rewards.xp, 0, 'Mua vật phẩm')
+        dispatchRewardEvent(rewards.xp, 0, 'Purchase item')
         return true
       },
       
@@ -389,8 +389,8 @@ export const useGameStore = create<GameState>()(
 export const SHOP_ITEMS: ShopItem[] = [
   {
     id: 'hat-straw',
-    name: 'Mũ Cỏ Xanh',
-    description: 'Mũ cỏ Minecraft — vật phẩm phổ biến nhất mùa xuân!',
+    name: 'Green Straw Hat',
+    description: 'Minecraft straw hat — most popular spring item!',
     price: 25,
     category: 'hat',
     rarity: 'common',
@@ -399,8 +399,8 @@ export const SHOP_ITEMS: ShopItem[] = [
   },
   {
     id: 'hat-crown',
-    name: 'Vương Miện Vàng',
-    description: 'Biến cây của bạn thành vua với chiếc vương miện lấp lánh.',
+    name: 'Golden Crown',
+    description: 'Turn your plant into royalty with this sparkling crown.',
     price: 100,
     category: 'hat',
     rarity: 'legendary',
@@ -409,8 +409,8 @@ export const SHOP_ITEMS: ShopItem[] = [
   },
   {
     id: 'glasses-cool',
-    name: 'Kính Pixel Ngầu',
-    description: 'Kính pixelated cho cây ngầu nhất khu phố.',
+    name: 'Cool Pixel Glasses',
+    description: 'Pixelated glasses for the coolest plant in the neighborhood.',
     price: 30,
     category: 'glasses',
     rarity: 'common',
@@ -419,8 +419,8 @@ export const SHOP_ITEMS: ShopItem[] = [
   },
   {
     id: 'glasses-heart',
-    name: 'Kính Hoa Hướng Dương',
-    description: 'Thể hiện tình yêu với đôi kính hình trái tim đáng yêu.',
+    name: 'Sunflower Glasses',
+    description: 'Show some love with these adorable heart-shaped glasses.',
     price: 45,
     category: 'glasses',
     rarity: 'common',
@@ -429,8 +429,8 @@ export const SHOP_ITEMS: ShopItem[] = [
   },
   {
     id: 'block-dirt',
-    name: 'Khối Đất',
-    description: 'Khối đất Minecraft kinh điển. Đặt ở bất cứ đâu!',
+    name: 'Dirt Block',
+    description: 'Classic Minecraft dirt block. Place it anywhere!',
     price: 15,
     category: 'block',
     rarity: 'common',
@@ -439,8 +439,8 @@ export const SHOP_ITEMS: ShopItem[] = [
   },
   {
     id: 'block-diamond',
-    name: 'Khối Kim Cương',
-    description: 'Khối quý hiếm nhất — thể hiện sự giàu có!',
+    name: 'Diamond Block',
+    description: 'The rarest block — show off your wealth!',
     price: 250,
     category: 'block',
     rarity: 'legendary',
@@ -449,8 +449,8 @@ export const SHOP_ITEMS: ShopItem[] = [
   },
   {
     id: 'vfx-sparkle',
-    name: 'Hiệu Ứng Lấp Lánh',
-    description: 'Thêm những tia sáng kỳ diệu bay quanh cây.',
+    name: 'Sparkle Effect',
+    description: 'Add magical glowing sparkles around your plant.',
     price: 50,
     category: 'vfx',
     rarity: 'common',
@@ -459,8 +459,8 @@ export const SHOP_ITEMS: ShopItem[] = [
   },
   {
     id: 'vfx-rainbow',
-    name: 'Hào Quang Cầu Vồng',
-    description: 'Vầng hào quang cầu vồng bao quanh cây.',
+    name: 'Rainbow Aura',
+    description: 'A beautiful rainbow aura surrounding your plant.',
     price: 150,
     category: 'vfx',
     rarity: 'rare',

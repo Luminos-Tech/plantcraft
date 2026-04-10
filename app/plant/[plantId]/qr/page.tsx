@@ -114,12 +114,12 @@ export default function PlantQRPage({ params }: PageProps) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
         <span className="text-4xl">❓</span>
-        <h2 className="mt-4 font-pixel text-sm text-foreground">Không tìm thấy cây</h2>
+        <h2 className="mt-4 font-pixel text-sm text-foreground">Plant not found</h2>
         <Button
           onClick={() => router.push('/dashboard')}
           className="mt-6 rounded-sm bg-primary font-pixel text-xs text-primary-foreground"
         >
-          Về Vườn
+          Back to Garden
         </Button>
       </div>
     )
@@ -146,7 +146,7 @@ export default function PlantQRPage({ params }: PageProps) {
             <div className="rounded-sm border-2 border-primary/30 p-2 bg-[#F5F0E8]">
               <img
                 src={qrDataUrl}
-                alt={`QR code cho ${plant.name}`}
+                alt={`QR code for ${plant.name}`}
                 width={250}
                 height={250}
                 className="rounded-sm"
@@ -161,12 +161,12 @@ export default function PlantQRPage({ params }: PageProps) {
         <div className="mt-4 flex items-center justify-between rounded-sm border border-border bg-secondary/50 p-3">
           <div className="text-left">
             <p className="font-pixel text-[8px] text-foreground">
-              {isPublic ? '🌐 Đang chia sẻ' : '🔒 Riêng tư'}
+              {isPublic ? '🌐 Sharing' : '🔒 Private'}
             </p>
             <p className="mt-0.5 text-[10px] text-muted-foreground">
               {isPublic
-                ? 'Bạn bè có thể thấy HP cây qua QR'
-                : 'Bật chia sẻ để bạn bè thấy cây'}
+                ? 'Friends can see HP via QR'
+                : 'Enable sharing to show friends'}
             </p>
           </div>
           <button
@@ -186,7 +186,7 @@ export default function PlantQRPage({ params }: PageProps) {
 
         {/* Instructions */}
         <p className="mt-4 text-xs text-muted-foreground">
-          In QR này và dán lên chậu cây để bạn bè quét!
+          Print this QR and attach to your plant pot for friends to scan!
         </p>
       </div>
 
@@ -197,29 +197,29 @@ export default function PlantQRPage({ params }: PageProps) {
           onClick={() => router.push('/dashboard')}
           className="rounded-sm border-2 border-primary font-pixel text-xs"
         >
-          ← Quay lại
+          ← Back
         </Button>
         {qrDataUrl && (
           <Button
             onClick={handleDownloadQR}
             className="rounded-sm bg-accent font-pixel text-xs text-accent-foreground hover:bg-accent/90"
           >
-            📥 Tải QR
+            📥 Download QR
           </Button>
         )}
         <Button
           onClick={() => {
             if (navigator.share) {
               navigator.share({
-                title: `Xem cây ${plant.name} trên PlantCraft!`,
-                text: `Quét QR để xem cây ${plant.name} trong AR!`,
+                title: `View ${plant.name} on PlantCraft!`,
+                text: `Scan QR to view ${plant.name} in AR!`,
                 url: window.location.href,
               })
             }
           }}
           className="rounded-sm bg-primary font-pixel text-xs text-primary-foreground"
         >
-          📤 Chia sẻ
+          📤 Share
         </Button>
       </div>
     </div>

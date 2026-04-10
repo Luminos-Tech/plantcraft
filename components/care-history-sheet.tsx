@@ -24,12 +24,12 @@ const ACTION_ICONS: Record<CareLog['action'], string> = {
 }
 
 const ACTION_LABELS: Record<CareLog['action'], string> = {
-  water: 'Tưới nước',
-  wipe: 'Lau lá',
-  fertilize: 'Bón phân',
-  scan: 'Quét AI',
-  decorate: 'Trang trí',
-  cure: 'Chữa bệnh',
+  water: 'Watering',
+  wipe: 'Wiping leaves',
+  fertilize: 'Fertilizing',
+  scan: 'AI Scan',
+  decorate: 'Decorating',
+  cure: 'Curing',
 }
 
 function formatRelativeTime(timestamp: number): string {

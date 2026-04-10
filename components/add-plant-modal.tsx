@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useGameStore } from '@/lib/store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -107,6 +107,12 @@ export function AddPlantModal({ open, onOpenChange }: AddPlantModalProps) {
     setIsCapturing(false)
   }, [])
 
+  useEffect(() => {
+    if (isCapturing && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current
+    }
+  }, [isCapturing])
+
   const capturePhoto = useCallback(() => {
     if (!videoRef.current) return
 
@@ -186,15 +192,15 @@ export function AddPlantModal({ open, onOpenChange }: AddPlantModalProps) {
               className="hidden"
             />
             <div className="relative mt-1 aspect-square w-full overflow-hidden rounded-sm border-2 border-border bg-muted">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className={`h-full w-full object-cover ${isCapturing ? 'block' : 'hidden'}`}
+              />
               {isCapturing ? (
                 <>
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="h-full w-full object-cover"
-                  />
                   <Button
                     onClick={capturePhoto}
                     className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-sm bg-primary font-pixel text-[10px] text-primary-foreground"

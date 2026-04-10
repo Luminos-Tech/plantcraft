@@ -44,7 +44,7 @@ export function ARToolbar({ plantId, onScanComplete, videoRef }: ARToolbarProps)
         return
       }
 
-      const plantName = plant?.name || 'Cây không rõ'
+      const plantName = plant?.name || 'Unknown Plant'
       const result = await diagnosePlant(imageBlob, plantName)
 
       if (result) {
@@ -54,10 +54,10 @@ export function ARToolbar({ plantId, onScanComplete, videoRef }: ARToolbarProps)
         }
         onScanComplete(result)
       } else {
-        setScanError('AI không thể phân tích ảnh. Thử lại nhé!')
+        setScanError('AI could not analyze image. Try again!')
       }
     } catch {
-      setScanError('Lỗi kết nối. Vui lòng thử lại.')
+      setScanError('Connection error. Please try again.')
     } finally {
       setIsScanning(false)
     }
@@ -72,7 +72,7 @@ export function ARToolbar({ plantId, onScanComplete, videoRef }: ARToolbarProps)
     setScanError(null)
 
     try {
-      const plantName = plant?.name || 'Cây không rõ'
+      const plantName = plant?.name || 'Unknown Plant'
       const result = await diagnosePlant(file, plantName)
 
       if (result) {
@@ -81,10 +81,10 @@ export function ARToolbar({ plantId, onScanComplete, videoRef }: ARToolbarProps)
         }
         onScanComplete(result)
       } else {
-        setScanError('AI không thể phân tích ảnh. Thử lại nhé!')
+        setScanError('AI could not analyze image. Try again!')
       }
     } catch {
-      setScanError('Lỗi kết nối. Vui lòng thử lại.')
+      setScanError('Connection error. Please try again.')
     } finally {
       setIsScanning(false)
       // Reset input
@@ -145,7 +145,7 @@ export function ARToolbar({ plantId, onScanComplete, videoRef }: ARToolbarProps)
       {/* Empty inventory message */}
       {ownedShopItems.length === 0 && (
         <p className="mb-3 text-center font-pixel text-[8px] text-white/70">
-          Mua vật phẩm từ Shop để trang trí!
+          Buy items from Shop to decorate!
         </p>
       )}
 
@@ -165,16 +165,16 @@ export function ARToolbar({ plantId, onScanComplete, videoRef }: ARToolbarProps)
         {isScanning ? (
           <span className="flex items-center gap-2">
             <Spinner className="h-4 w-4" />
-            <span>AI đang phân tích...</span>
+            <span>AI analyzing...</span>
           </span>
         ) : (
-          <span>🔍 Quét bệnh AI</span>
+          <span>🔍 AI Disease Scan</span>
         )}
       </Button>
 
       {/* Hint Text */}
       <p className="mt-2 text-center font-pixel text-[6px] text-white/50">
-        Chọn vật phẩm để đặt • Hướng camera vào lá để quét
+        Select item to place • Point camera at leaf to scan
       </p>
     </div>
   )
