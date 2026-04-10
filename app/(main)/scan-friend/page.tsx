@@ -55,6 +55,13 @@ export default function ScanFriendPage() {
     }
   }, [stopCamera])
 
+  // Attach stream to video element when scanning starts
+  useEffect(() => {
+    if (scanState === 'scanning' && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current
+    }
+  }, [scanState])
+
   // QR scanning using jsQR
   const startQRScanning = () => {
     const canvas = document.createElement('canvas')
@@ -167,15 +174,15 @@ export default function ScanFriendPage() {
 
       {/* Scanner Area */}
       <div className="relative aspect-square w-full overflow-hidden rounded-sm border-2 border-primary bg-muted">
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className={`h-full w-full object-cover ${scanState === 'scanning' ? 'block' : 'hidden'}`}
+        />
         {scanState === 'scanning' ? (
           <>
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="h-full w-full object-cover"
-            />
             {/* Scanning overlay */}
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="relative h-48 w-48">

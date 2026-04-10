@@ -124,26 +124,7 @@ function CameraContent() {
     }
   }
 
-  // If no plant selected, show selector
-  if (!plant) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
-        <span className="text-4xl">🌿</span>
-        <h2 className="mt-4 font-pixel text-sm text-foreground">
-          Select a plant
-        </h2>
-        <p className="mt-2 text-center text-sm text-muted-foreground">
-          Go to garden and click &quot;AR Decor&quot; on the plant card.
-        </p>
-        <button
-          onClick={() => router.push('/dashboard')}
-          className="mt-6 rounded-sm bg-primary px-6 py-2 font-pixel text-xs text-primary-foreground"
-        >
-          Back to Garden
-        </button>
-      </div>
-    )
-  }
+  // No plant selected? We will show an overlay over the camera feed.
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-black">
@@ -160,144 +141,194 @@ function CameraContent() {
       <div
         id="ar-overlay"
         className="absolute inset-0"
-        onClick={handlePlaceItem}
+        onClick={plant ? handlePlaceItem : undefined}
       >
-        {/* HUD Top */}
-        <div className="pointer-events-auto relative z-10">
-          <ARPlantHUD plant={plant} onClose={handleClose} />
-        </div>
-
-        {/* Quick Care Actions */}
-        <div className="absolute right-3 top-24 z-10 flex flex-col gap-2 pointer-events-auto">
-          <button
-            onClick={(e) => { e.stopPropagation(); waterPlant(plant.id) }}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500/80 text-lg shadow-lg active:scale-95 transition-transform"
-            title="Water"
-          >
-            💧
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); wipePlant(plant.id) }}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500/80 text-lg shadow-lg active:scale-95 transition-transform"
-            title="Wipe leaves"
-          >
-            🍃
-          </button>
-        </div>
-
-        {/* Pending Disease Warning */}
-        {plant.pendingDiagnosis && (
-          <div className="absolute left-3 top-24 z-10 pointer-events-auto">
+        {!plant ? (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+            <h2 className="mb-6 text-center font-pixel text-sm text-white drop-shadow-md">
+              {plants.length > 0 ? 'Select a plant for AR' : 'Your garden is empty!'}
+            </h2>
+            {plants.length > 0 ? (
+              <div className="grid w-full max-w-xs grid-cols-2 gap-4">
+                {plants.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.replace(`/camera?plantId=${p.id}`);
+                    }}
+                    className="flex flex-col items-center gap-2 rounded-sm border-2 border-white/20 bg-black/40 p-4 transition-colors hover:border-primary hover:bg-black/60"
+                   >
+                    <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-sm border border-white/10 bg-white/5">
+                      {p.imageUrl ? (
+                        <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-xl">🌱</span>
+                      )}
+                    </div>
+                    <span className="line-clamp-1 text-center font-pixel text-[8px] text-white">
+                      {p.name}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-center text-sm text-white/80">
+                Go back to your garden and add a plant first.
+              </p>
+            )}
             <button
               onClick={(e) => {
-                e.stopPropagation()
-                setScanResult(plant.pendingDiagnosis!)
+                e.stopPropagation();
+                router.push('/dashboard');
               }}
-              className="rounded-sm bg-red-500/90 px-3 py-2 font-pixel text-[8px] text-white shadow-lg animate-pulse"
+              className="mt-8 rounded-sm bg-primary px-6 py-2 font-pixel text-xs text-primary-foreground"
             >
-              🚨 {plant.pendingDiagnosis.disease}
-              <br />
-              <span className="text-[6px] opacity-80">Click for details</span>
+              Back to Garden
             </button>
           </div>
-        )}
-
-        {/* Hint Overlay */}
-        {showHint && isReady && (
-          <div className="absolute inset-0 z-[5] flex items-center justify-center pointer-events-none">
-            <div
-              className="rounded-sm bg-black/50 px-6 py-4 text-center animate-pulse"
-              style={{ backdropFilter: 'blur(4px)' }}
-            >
-              <span className="font-pixel text-xs text-white">
-                👆 Tap on plant to place items
-              </span>
+        ) : (
+          <>
+            {/* HUD Top */}
+            <div className="pointer-events-auto relative z-10">
+              <ARPlantHUD plant={plant} onClose={handleClose} />
             </div>
-          </div>
-        )}
 
-        {/* Placed Items Visualization */}
-        {placedItems.map((item) => {
-          const visual = getItemVisual(item.itemId)
-          return (
-            <div
-              key={item.id}
-              className="absolute pointer-events-none"
-              style={{
-                left: `${item.x}%`,
-                top: `${item.y}%`,
-                transform: `translate(-50%, -50%) rotate(${item.rotation}deg) scale(${item.scale})`,
-              }}
-            >
-              {/* 3D-ish voxel block representation */}
-              <div
-                className="relative h-12 w-12 flex items-center justify-center animate-bounce"
-                style={{ animationDuration: '2s' }}
+            {/* Quick Care Actions */}
+            <div className="absolute right-3 top-24 z-10 flex flex-col gap-2 pointer-events-auto">
+              <button
+                onClick={(e) => { e.stopPropagation(); waterPlant(plant.id) }}
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500/80 text-lg shadow-lg active:scale-95 transition-transform"
+                title="Water"
               >
-                {/* Shadow */}
-                <div
-                  className="absolute bottom-0 left-1/2 -translate-x-1/2 h-2 w-10 rounded-full opacity-30"
-                  style={{ background: 'black', filter: 'blur(3px)' }}
-                />
-                {/* Item body */}
-                <div
-                  className="relative flex h-10 w-10 items-center justify-center rounded-sm border-2 shadow-lg"
-                  style={{
-                    borderColor: visual.color,
-                    background: `${visual.color}33`,
-                    boxShadow: `0 0 12px ${visual.color}66`,
+                💧
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); wipePlant(plant.id) }}
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500/80 text-lg shadow-lg active:scale-95 transition-transform"
+                title="Wipe leaves"
+              >
+                🍃
+              </button>
+            </div>
+
+            {/* Pending Disease Warning */}
+            {plant.pendingDiagnosis && (
+              <div className="absolute left-3 top-24 z-10 pointer-events-auto">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setScanResult(plant.pendingDiagnosis!)
                   }}
+                  className="rounded-sm bg-red-500/90 px-3 py-2 font-pixel text-[8px] text-white shadow-lg animate-pulse"
                 >
-                  <span className="text-xl">{visual.emoji}</span>
+                  🚨 {plant.pendingDiagnosis.disease}
+                  <br />
+                  <span className="text-[6px] opacity-80">Click for details</span>
+                </button>
+              </div>
+            )}
+
+            {/* Hint Overlay */}
+            {showHint && isReady && (
+              <div className="absolute inset-0 z-[5] flex items-center justify-center pointer-events-none">
+                <div
+                  className="rounded-sm bg-black/50 px-6 py-4 text-center animate-pulse"
+                  style={{ backdropFilter: 'blur(4px)' }}
+                >
+                  <span className="font-pixel text-xs text-white">
+                    👆 Tap on plant to place items
+                  </span>
                 </div>
               </div>
-            </div>
-          )
-        })}
+            )}
 
-        {/* Currently equipped items from store */}
-        {plant.equippedItems.length > 0 && isReady && placedItems.length === 0 && (
-          <div className="absolute left-1/2 top-1/3 -translate-x-1/2 pointer-events-none">
-            <div className="flex flex-wrap justify-center gap-2">
-              {plant.equippedItems.slice(0, 6).map((itemId, idx) => {
-                const visual = getItemVisual(itemId)
-                return (
+            {/* Placed Items Visualization */}
+            {placedItems.map((item) => {
+              const visual = getItemVisual(item.itemId)
+              return (
+                <div
+                  key={item.id}
+                  className="absolute pointer-events-none"
+                  style={{
+                    left: `${item.x}%`,
+                    top: `${item.y}%`,
+                    transform: `translate(-50%, -50%) rotate(${item.rotation}deg) scale(${item.scale})`,
+                  }}
+                >
+                  {/* 3D-ish voxel block representation */}
                   <div
-                    key={`${itemId}-${idx}`}
-                    className="flex h-10 w-10 items-center justify-center rounded-sm border-2 animate-bounce shadow-lg"
-                    style={{
-                      animationDelay: `${idx * 0.3}s`,
-                      animationDuration: '2s',
-                      borderColor: visual.color,
-                      background: `${visual.color}33`,
-                      boxShadow: `0 0 12px ${visual.color}44`,
-                    }}
+                    className="relative h-12 w-12 flex items-center justify-center animate-bounce"
+                    style={{ animationDuration: '2s' }}
                   >
-                    <span className="text-lg">{visual.emoji}</span>
+                    {/* Shadow */}
+                    <div
+                      className="absolute bottom-0 left-1/2 -translate-x-1/2 h-2 w-10 rounded-full opacity-30"
+                      style={{ background: 'black', filter: 'blur(3px)' }}
+                    />
+                    {/* Item body */}
+                    <div
+                      className="relative flex h-10 w-10 items-center justify-center rounded-sm border-2 shadow-lg"
+                      style={{
+                        borderColor: visual.color,
+                        background: `${visual.color}33`,
+                        boxShadow: `0 0 12px ${visual.color}66`,
+                      }}
+                    >
+                      <span className="text-xl">{visual.emoji}</span>
+                    </div>
                   </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
+                </div>
+              )
+            })}
 
-        {/* HUD Bottom */}
-        <div className="pointer-events-auto relative z-10">
-          <ARToolbar
-            plantId={plant.id}
-            onScanComplete={handleScanComplete}
-            videoRef={videoRef}
-          />
-        </div>
+            {/* Currently equipped items from store */}
+            {plant.equippedItems.length > 0 && isReady && placedItems.length === 0 && (
+              <div className="absolute left-1/2 top-1/3 -translate-x-1/2 pointer-events-none">
+                <div className="flex flex-wrap justify-center gap-2">
+                  {plant.equippedItems.slice(0, 6).map((itemId, idx) => {
+                    const visual = getItemVisual(itemId)
+                    return (
+                      <div
+                        key={`${itemId}-${idx}`}
+                        className="flex h-10 w-10 items-center justify-center rounded-sm border-2 animate-bounce shadow-lg"
+                        style={{
+                          animationDelay: `${idx * 0.3}s`,
+                          animationDuration: '2s',
+                          borderColor: visual.color,
+                          background: `${visual.color}33`,
+                          boxShadow: `0 0 12px ${visual.color}44`,
+                        }}
+                      >
+                        <span className="text-lg">{visual.emoji}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* HUD Bottom */}
+            <div className="pointer-events-auto relative z-10">
+              <ARToolbar
+                plantId={plant.id}
+                onScanComplete={handleScanComplete}
+                videoRef={videoRef}
+              />
+            </div>
+          </>
+        )}
       </div>
 
       {/* Scan Result Modal */}
-      <ScanResultModal
-        result={scanResult}
-        plantId={plant.id}
-        open={!!scanResult}
-        onOpenChange={(open) => !open && setScanResult(null)}
-      />
+      {plant && (
+        <ScanResultModal
+          result={scanResult}
+          plantId={plant.id}
+          open={!!scanResult}
+          onOpenChange={(open) => !open && setScanResult(null)}
+        />
+      )}
     </div>
   )
 }
