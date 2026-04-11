@@ -11,14 +11,15 @@ interface ARToolbarProps {
   plantId: string
   onScanComplete: (result: DiagnosisResult) => void
   videoRef?: React.RefObject<HTMLVideoElement | null>
+  selectedItemId: string | null
+  onItemSelected: (itemId: string | null) => void
 }
 
-export function ARToolbar({ plantId, onScanComplete, videoRef }: ARToolbarProps) {
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+export function ARToolbar({ plantId, onScanComplete, videoRef, selectedItemId, onItemSelected }: ARToolbarProps) {
   const [isScanning, setIsScanning] = useState(false)
   const [scanError, setScanError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { ownedItems, equipItem, plants, setPendingDiagnosis } = useGameStore()
+  const { ownedItems, plants, setPendingDiagnosis } = useGameStore()
 
   const plant = plants.find((p) => p.id === plantId)
   const ownedShopItems = SHOP_ITEMS.filter((item) =>
@@ -94,12 +95,9 @@ export function ARToolbar({ plantId, onScanComplete, videoRef }: ARToolbarProps)
 
   const handleItemSelect = (item: ShopItem) => {
     if (selectedItemId === item.id) {
-      setSelectedItemId(null)
+      onItemSelected(null)
     } else {
-      setSelectedItemId(item.id)
-      if (plant && !plant.equippedItems.includes(item.id)) {
-        equipItem(plantId, item.id)
-      }
+      onItemSelected(item.id)
     }
   }
 

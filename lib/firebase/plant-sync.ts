@@ -8,9 +8,9 @@ import type { Plant } from '@/lib/store'
 export interface SharedPlacedItem {
   id: string
   itemId: string
-  position: { x: number; y: number; z: number }
-  rotation: { x: number; y: number; z: number; w: number }
-  scale: { x: number; y: number; z: number }
+  anchorX: number
+  anchorY: number
+  scaleRatio: number
 }
 
 export interface PublicPlantData {
@@ -48,10 +48,21 @@ export async function publishToFirebase(
 
     const { ref, set } = await import('firebase/database' as string) as typeof import('firebase/database')
 
+    // Map local PlacedItems to Firebase format
+    const sharedItems: SharedPlacedItem[] = (plant.placedItems || [])
+      .filter(item => item.isShared)
+      .map(item => ({
+        id: item.id,
+        itemId: item.itemId,
+        anchorX: item.anchorX,
+        anchorY: item.anchorY,
+        scaleRatio: item.scaleRatio,
+      }))
+
     const data: PublicPlantData = {
       name: plant.name,
       hp,
-      placedItems: [],
+      placedItems: sharedItems,
       lastUpdated: Date.now(),
     }
 
@@ -76,6 +87,46 @@ export async function unpublishFromFirebase(
   } catch {
     return false
   }
+}
+
+export async function syncPlacedItemToFirebase(
+  plantId: string,
+  ownerUid: string,
+  item: import('@/lib/store').PlacedItem
+): Promise<void> {
+  if (!item.isShared) return
+  
+  try {
+    const db = await getDB()
+    if (!db) return
+
+    const sharedItem: SharedPlacedItem = {
+      id: item.id,
+      itemId: item.itemId,
+      anchorX: item.anchorX,
+      anchorY: item.anchorY,
+      scaleRatio: item.scaleRatio,
+    }
+
+    const { ref, set } = await import('firebase/database' as string) as typeof import('firebase/database')
+    await set(ref(db, `plantcraft-public/${ownerUid}/${plantId}/placedItems/${item.id}`), sharedItem)
+    await set(ref(db, `plantcraft-public/${ownerUid}/${plantId}/lastUpdated`), Date.now())
+  } catch {}
+}
+
+export async function removeSharedItemFromFirebase(
+  plantId: string,
+  ownerUid: string,
+  itemInstanceId: string
+): Promise<void> {
+  try {
+    const db = await getDB()
+    if (!db) return
+
+    const { ref, remove, set } = await import('firebase/database' as string) as typeof import('firebase/database')
+    await remove(ref(db, `plantcraft-public/${ownerUid}/${plantId}/placedItems/${itemInstanceId}`))
+    await set(ref(db, `plantcraft-public/${ownerUid}/${plantId}/lastUpdated`), Date.now())
+  } catch {}
 }
 
 export async function syncHPToFirebase(
