@@ -68,7 +68,7 @@ If the image is not a plant leaf, return { "disease": "Not a leaf image", "sever
           }],
           generationConfig: {
             temperature: 0.1,
-            maxOutputTokens: 512
+            maxOutputTokens: 1024
           }
         }),
         signal: AbortSignal.timeout(15000), // 15s timeout
@@ -85,11 +85,31 @@ If the image is not a plant leaf, return { "disease": "Not a leaf image", "sever
     }
 
     const data = await response.json()
+
+    // Thêm dòng này — log toàn bộ response để debug
+    console.log('Gemini raw response:', JSON.stringify(data, null, 2))
+
     const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
 
-    // Strip markdown fences if model adds them
+    // Kiểm tra Gemini có trả về gì không trước khi parse
+    if (!rawText) {
+      console.error('Gemini trả về rỗng. Finish reason:', 
+        data.candidates?.[0]?.finishReason)
+      // finishReason: "MAX_TOKENS" = bị cắt, "SAFETY" = bị chặn bởi safety filter
+      throw new Error('Gemini không trả về nội dung')
+    }
+
     const cleanJson = rawText.replace(/```json|```/g, '').trim()
-    const result: DiagnosisResult = JSON.parse(cleanJson)
+
+    // Bọc JSON.parse trong try/catch riêng để biết chính xác lỗi
+    let result: DiagnosisResult
+    try {
+      result = JSON.parse(cleanJson)
+    } catch (parseError) {
+      console.error('JSON.parse thất bại. Raw text nhận được:', rawText)
+      // In ra để biết Gemini đang trả về gì thực sự
+      throw new Error('Response không phải JSON hợp lệ')
+    }
 
     return NextResponse.json(result)
   } catch (error) {
