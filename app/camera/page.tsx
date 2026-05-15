@@ -292,8 +292,8 @@ function CameraContent() {
       {/* AI Result Modal */}
       {scanResult && plantId && (
         <ScanResultModal
-          isOpen={!!scanResult}
-          onClose={() => setScanResult(null)}
+          open={!!scanResult}
+          onOpenChange={(isOpen) => { if (!isOpen) setScanResult(null) }}
           result={scanResult}
           plantId={plantId}
         />

@@ -16,6 +16,36 @@ interface DiagnosisResult {
   isHealthy: boolean
 }
 
+/** Gemini có thể tách nội dung qua nhiều `parts`; phải nối hết trước khi parse JSON. */
+function textFromCandidate(candidate: {
+  content?: { parts?: { text?: string }[] }
+}): string {
+  const parts = candidate?.content?.parts ?? []
+  return parts
+    .map((p) => (typeof p.text === 'string' ? p.text : ''))
+    .join('')
+    .trim()
+}
+
+/** Schema cho JSON mode — giảm lỗi cắt nửa chừng / markdown so với chỉ nhắc trong prompt. */
+const diagnosisResponseSchema = {
+  type: 'OBJECT',
+  properties: {
+    disease: { type: 'STRING' },
+    severity: {
+      type: 'STRING',
+      description: 'Exactly one of: mild, moderate, severe',
+    },
+    treatments: {
+      type: 'ARRAY',
+      items: { type: 'STRING' },
+    },
+    confidence: { type: 'NUMBER' },
+    isHealthy: { type: 'BOOLEAN' },
+  },
+  required: ['disease', 'severity', 'treatments', 'confidence', 'isHealthy'],
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { imageBase64, mimeType, plantName } = await request.json()
@@ -36,18 +66,36 @@ export async function POST(request: NextRequest) {
     }
 
     const systemPrompt = `
-You are a plant disease diagnosis expert.
-Analyze the plant leaf image and return JSON with the following structure (NO markdown, NO backticks):
+You are a cautious plant health assistant specializing in visual leaf disease screening.
+
+Your task:
+Analyze the provided image and the claimed plant name. Return ONLY valid JSON. No markdown, no explanations outside JSON.
+
+Important rules:
+- Do not guess a specific disease when visual evidence is insufficient.
+- If the image is blurry, too dark, too far away, not a leaf, or symptoms are unclear, return "Unknown / insufficient image quality".
+- If the plant appears healthy, set disease to "Healthy", isHealthy to true, severity to "none", and treatments to basic care tips.
+- If the plant name does not seem consistent with the image, mention that in notes.
+- Prefer practical, low-risk treatments first: isolate affected plant, remove damaged leaves, improve airflow, avoid overwatering, monitor progression.
+- Do not give exact pesticide or fungicide dosage. Recommend consulting local agricultural guidance for chemical treatments.
+- Confidence must reflect image quality and symptom clarity:
+  - 0.0-0.3: not a leaf, unusable image, or impossible to determine
+  - 0.4-0.6: possible issue but uncertain
+  - 0.7-0.85: likely diagnosis
+  - 0.86-1.0: very clear visual evidence
+
+Return JSON exactly in this structure:
 {
-  "disease": "disease name in English, or 'Healthy' if no disease is found",
-  "severity": "mild | moderate | severe",
+  "disease": "English disease name, Healthy, Not a leaf image, or Unknown / insufficient image quality",
+  "severity": "none | mild | moderate | severe | unknown",
   "treatments": ["step 1", "step 2", "step 3"],
-  "confidence": 0.0-1.0,
-  "isHealthy": true | false
+  "confidence": 0.0,
+  "isHealthy": false,
+  "notes": "short explanation of key visible symptoms or uncertainty"
 }
-Plant name: ${plantName}.
-If the image is not a plant leaf, return { "disease": "Not a leaf image", "severity": "mild", "treatments": ["Please take a photo of a plant leaf"], "confidence": 0, "isHealthy": false }.
-    `.trim()
+
+Plant name claimed by user: "${plantName}".
+`.trim()
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
@@ -68,8 +116,12 @@ If the image is not a plant leaf, return { "disease": "Not a leaf image", "sever
           }],
           generationConfig: {
             temperature: 0.1,
-            maxOutputTokens: 1024
-          }
+            // Gemini 2.5: thinking + text cùng trần maxOutputTokens — giữ cao + tắt thinking.
+            maxOutputTokens: 8192,
+            thinkingConfig: { thinkingBudget: 0 },
+            responseMimeType: 'application/json',
+            responseSchema: diagnosisResponseSchema,
+          },
         }),
         signal: AbortSignal.timeout(15000), // 15s timeout
       }
@@ -86,28 +138,37 @@ If the image is not a plant leaf, return { "disease": "Not a leaf image", "sever
 
     const data = await response.json()
 
-    // Thêm dòng này — log toàn bộ response để debug
-    console.log('Gemini raw response:', JSON.stringify(data, null, 2))
+    const candidate = data.candidates?.[0]
+    const finishReason = candidate?.finishReason as string | undefined
+    const rawText = textFromCandidate(candidate ?? {})
 
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
-
-    // Kiểm tra Gemini có trả về gì không trước khi parse
     if (!rawText) {
-      console.error('Gemini trả về rỗng. Finish reason:', 
-        data.candidates?.[0]?.finishReason)
-      // finishReason: "MAX_TOKENS" = bị cắt, "SAFETY" = bị chặn bởi safety filter
+      console.error(
+        'Gemini trả về rỗng. finishReason:',
+        finishReason,
+        'raw:',
+        JSON.stringify(data).slice(0, 2000)
+      )
       throw new Error('Gemini không trả về nội dung')
     }
 
     const cleanJson = rawText.replace(/```json|```/g, '').trim()
 
-    // Bọc JSON.parse trong try/catch riêng để biết chính xác lỗi
     let result: DiagnosisResult
     try {
-      result = JSON.parse(cleanJson)
-    } catch (parseError) {
-      console.error('JSON.parse thất bại. Raw text nhận được:', rawText)
-      // In ra để biết Gemini đang trả về gì thực sự
+      result = JSON.parse(cleanJson) as DiagnosisResult
+    } catch {
+      console.error(
+        'JSON.parse thất bại. finishReason:',
+        finishReason,
+        'raw text:',
+        rawText
+      )
+      if (finishReason === 'MAX_TOKENS') {
+        throw new Error(
+          'Phản hồi AI bị cắt (MAX_TOKENS). Hãy thử lại hoặc báo lỗi nếu vẫn lặp lại.'
+        )
+      }
       throw new Error('Response không phải JSON hợp lệ')
     }
 
@@ -120,6 +181,17 @@ If the image is not a plant leaf, return { "disease": "Not a leaf image", "sever
         { error: 'AI returned an invalid result. Please try again.' },
         { status: 500 }
       )
+    }
+
+    if (error instanceof Error) {
+      const m = error.message
+      if (
+        m === 'Response không phải JSON hợp lệ' ||
+        m === 'Gemini không trả về nội dung' ||
+        m.startsWith('Phản hồi AI bị cắt')
+      ) {
+        return NextResponse.json({ error: m }, { status: 500 })
+      }
     }
 
     return NextResponse.json(
