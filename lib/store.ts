@@ -3,6 +3,25 @@ import { persist } from 'zustand/middleware'
 
 // ===== TYPES =====
 
+export interface PlacedItem {
+  id: string
+  itemId: string
+  plantId: string
+  anchorX: number
+  anchorY: number
+  scaleRatio: number
+  isShared: boolean
+  placedAt: number
+}
+
+// Default anchor positions for each item category
+export const ITEM_DEFAULT_ANCHOR: Record<string, { anchorX: number; anchorY: number; scaleRatio: number }> = {
+  hat:     { anchorX: 0.5, anchorY: -0.25, scaleRatio: 0.45 },
+  glasses: { anchorX: 0.5, anchorY: 0.25,  scaleRatio: 0.40 },
+  block:   { anchorX: 0.8, anchorY: 0.6,   scaleRatio: 0.30 },
+  vfx:     { anchorX: 0.5, anchorY: 0.5,   scaleRatio: 0.90 },
+}
+
 export interface Plant {
   id: string
   name: string
@@ -10,7 +29,8 @@ export interface Plant {
   lastWatered: number      // timestamp ms
   lastWipedAt: number      // timestamp ms
   createdAt: number        // timestamp ms
-  equippedItems: string[]
+  equippedItems: string[]  // legacy support
+  placedItems: PlacedItem[] // new AR filter items
   pendingDiagnosis?: DiagnosisResult | null
   isPublic: boolean
 }
@@ -45,6 +65,17 @@ export interface CareLog {
   action: 'water' | 'wipe' | 'fertilize' | 'scan' | 'decorate' | 'cure'
   timestamp: number
   notes?: string
+}
+
+export interface FriendPlant {
+  id: string               // unique key in our local list
+  ownerUid: string         // firebase uid of friend
+  plantId: string          // original plant id on friend's account
+  name: string
+  hp: number
+  placedItems: Pick<PlacedItem, "id" | "itemId" | "anchorX" | "anchorY" | "scaleRatio">[]
+  lastUpdated: number
+  addedAt: number          // when we saved this friend plant
 }
 
 export interface RewardLog {
@@ -98,10 +129,11 @@ interface GameState {
   setPlantPublic: (plantId: string, isPublic: boolean) => void
   updateAllHP: () => void
   
-  // Shop Actions
   purchaseItem: (itemId: string, price: number) => boolean
   equipItem: (plantId: string, itemId: string) => void
   unequipItem: (plantId: string, itemId: string) => void
+  savePlacedItem: (plantId: string, item: PlacedItem) => void
+  removePlacedItem: (plantId: string, itemInstanceId: string) => void
   
   // XP & Leveling
   addXp: (amount: number) => void
@@ -109,6 +141,12 @@ interface GameState {
   
   // Care Logs
   addCareLog: (plantId: string, action: CareLog['action'], notes?: string) => void
+  
+  // Friend Plants
+  friendPlants: FriendPlant[]
+  addFriendPlant: (ownerUid: string, plantId: string, data: { name: string; hp: number; placedItems: FriendPlant['placedItems']; lastUpdated: number }) => void
+  removeFriendPlant: (id: string) => void
+  updateFriendPlant: (id: string, data: Partial<Pick<FriendPlant, 'name' | 'hp' | 'placedItems' | 'lastUpdated'>>) => void
   
   // Utility
   getPlantHp: (plantId: string) => number
@@ -138,6 +176,7 @@ export const useGameStore = create<GameState>()(
       ownedItems: [],
       careLogs: [],
       rewardHistory: [],
+      friendPlants: [],
       
       // ── Plant Actions ──
 
@@ -151,6 +190,7 @@ export const useGameStore = create<GameState>()(
           lastWipedAt: now,
           createdAt: now,
           equippedItems: [],
+          placedItems: [],
           pendingDiagnosis: null,
           isPublic: false,
         }
@@ -321,6 +361,45 @@ export const useGameStore = create<GameState>()(
           ),
         }))
       },
+
+      savePlacedItem: (plantId, item) => {
+        set((state) => ({
+          plants: state.plants.map((p) =>
+            p.id === plantId
+              ? { ...p, placedItems: [...(p.placedItems || []), item] }
+              : p
+          ),
+        }))
+        
+        if (item.isShared && typeof window !== 'undefined') {
+          const ownerUid = localStorage.getItem('plantcraft_uid')
+          if (ownerUid) {
+            import('@/lib/firebase/plant-sync').then(({ syncPlacedItemToFirebase }) => {
+              syncPlacedItemToFirebase(plantId, ownerUid, item).catch(console.warn)
+            })
+          }
+        }
+      },
+
+      removePlacedItem: (plantId, itemInstanceId) => {
+        const plant = get().plants.find((p) => p.id === plantId)
+        set((state) => ({
+          plants: state.plants.map((p) =>
+            p.id === plantId
+              ? { ...p, placedItems: (p.placedItems || []).filter((i) => i.id !== itemInstanceId) }
+              : p
+          ),
+        }))
+
+        if (plant?.isPublic && typeof window !== 'undefined') {
+          const ownerUid = localStorage.getItem('plantcraft_uid')
+          if (ownerUid) {
+            import('@/lib/firebase/plant-sync').then(({ removeSharedItemFromFirebase }) => {
+              removeSharedItemFromFirebase(plantId, ownerUid, itemInstanceId).catch(console.warn)
+            })
+          }
+        }
+      },
       
       // ── XP & Leveling ──
 
@@ -368,6 +447,44 @@ export const useGameStore = create<GameState>()(
         const hp = Math.max(0, Math.min(100, 100 - Math.floor(hoursSinceWatered * 4)))
         return hp
       },
+
+      // ── Friend Plants ──
+
+      addFriendPlant: (ownerUid, plantId, data) => {
+        // Don't add duplicates (same ownerUid + plantId)
+        const existing = get().friendPlants.find(
+          (f) => f.ownerUid === ownerUid && f.plantId === plantId
+        )
+        if (existing) {
+          // Update data instead
+          get().updateFriendPlant(existing.id, data)
+          return
+        }
+        const newFriend: FriendPlant = {
+          id: crypto.randomUUID(),
+          ownerUid,
+          plantId,
+          ...data,
+          addedAt: Date.now(),
+        }
+        set((state) => ({
+          friendPlants: [...state.friendPlants, newFriend],
+        }))
+      },
+
+      removeFriendPlant: (id) => {
+        set((state) => ({
+          friendPlants: state.friendPlants.filter((f) => f.id !== id),
+        }))
+      },
+
+      updateFriendPlant: (id, data) => {
+        set((state) => ({
+          friendPlants: state.friendPlants.map((f) =>
+            f.id === id ? { ...f, ...data, lastUpdated: Date.now() } : f
+          ),
+        }))
+      },
     }),
     {
       name: 'plantcraft-storage',
@@ -379,6 +496,7 @@ export const useGameStore = create<GameState>()(
         ownedItems: state.ownedItems,
         careLogs: state.careLogs,
         rewardHistory: state.rewardHistory,
+        friendPlants: state.friendPlants,
       }),
     }
   )

@@ -11,14 +11,15 @@ interface ARToolbarProps {
   plantId: string
   onScanComplete: (result: DiagnosisResult) => void
   videoRef?: React.RefObject<HTMLVideoElement | null>
+  selectedItemId: string | null
+  onItemSelected: (itemId: string | null) => void
 }
 
-export function ARToolbar({ plantId, onScanComplete, videoRef }: ARToolbarProps) {
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+export function ARToolbar({ plantId, onScanComplete, videoRef, selectedItemId, onItemSelected }: ARToolbarProps) {
   const [isScanning, setIsScanning] = useState(false)
   const [scanError, setScanError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { ownedItems, equipItem, plants, setPendingDiagnosis } = useGameStore()
+  const { ownedItems, plants, setPendingDiagnosis } = useGameStore()
 
   const plant = plants.find((p) => p.id === plantId)
   const ownedShopItems = SHOP_ITEMS.filter((item) =>
@@ -94,12 +95,9 @@ export function ARToolbar({ plantId, onScanComplete, videoRef }: ARToolbarProps)
 
   const handleItemSelect = (item: ShopItem) => {
     if (selectedItemId === item.id) {
-      setSelectedItemId(null)
+      onItemSelected(null)
     } else {
-      setSelectedItemId(item.id)
-      if (plant && !plant.equippedItems.includes(item.id)) {
-        equipItem(plantId, item.id)
-      }
+      onItemSelected(item.id)
     }
   }
 
@@ -117,7 +115,6 @@ export function ARToolbar({ plantId, onScanComplete, videoRef }: ARToolbarProps)
         ref={fileInputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         className="hidden"
         onChange={handleFileSelect}
       />
@@ -156,21 +153,25 @@ export function ARToolbar({ plantId, onScanComplete, videoRef }: ARToolbarProps)
         </p>
       )}
 
-      {/* AI Scan Button */}
-      <Button
-        onClick={handleScan}
-        disabled={isScanning}
-        className="w-full rounded-sm bg-primary font-pixel text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-70"
-      >
-        {isScanning ? (
-          <span className="flex items-center gap-2">
-            <Spinner className="h-4 w-4" />
-            <span>AI analyzing...</span>
-          </span>
-        ) : (
-          <span>🔍 AI Disease Scan</span>
-        )}
-      </Button>
+      {/* Action Buttons */}
+      <div className="grid grid-cols-2 gap-2">
+        <Button
+          onClick={handleScan}
+          disabled={isScanning}
+          className="rounded-sm bg-primary font-pixel text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-70"
+        >
+          {isScanning ? <Spinner className="h-4 w-4" /> : <span>🔍 Scan Plant</span>}
+        </Button>
+        
+        <Button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isScanning}
+          variant="outline"
+          className="rounded-sm border-2 border-primary bg-background/50 text-white font-pixel text-xs hover:bg-primary/20 disabled:opacity-70"
+        >
+          {isScanning ? <Spinner className="h-4 w-4" /> : <span>📁 Upload Pic</span>}
+        </Button>
+      </div>
 
       {/* Hint Text */}
       <p className="mt-2 text-center font-pixel text-[6px] text-white/50">

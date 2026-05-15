@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { APP_VERSION } from '@/lib/version'
 
 interface NavItem {
   href: string
@@ -103,6 +104,9 @@ export function BottomNav() {
             </Link>
           )
         })}
+      </div>
+      <div className="pb-1 text-center font-pixel text-[6px] text-muted-foreground/50">
+        v{APP_VERSION}
       </div>
     </nav>
   )
