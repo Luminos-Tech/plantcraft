@@ -310,7 +310,16 @@ export const useGameStore = create<GameState>()(
       setPlantPublic: (plantId, isPublic) => {
         set((state) => ({
           plants: state.plants.map((p) =>
-            p.id === plantId ? { ...p, isPublic } : p
+            p.id === plantId
+              ? {
+                  ...p,
+                  isPublic,
+                  placedItems: (p.placedItems || []).map((item) => ({
+                    ...item,
+                    isShared: isPublic,
+                  })),
+                }
+              : p
           ),
         }))
       },
@@ -363,19 +372,25 @@ export const useGameStore = create<GameState>()(
       },
 
       savePlacedItem: (plantId, item) => {
+        const plant = get().plants.find((p) => p.id === plantId)
+        const itemToSave = {
+          ...item,
+          isShared: item.isShared || plant?.isPublic || false,
+        }
+
         set((state) => ({
           plants: state.plants.map((p) =>
             p.id === plantId
-              ? { ...p, placedItems: [...(p.placedItems || []), item] }
+              ? { ...p, placedItems: [...(p.placedItems || []), itemToSave] }
               : p
           ),
         }))
         
-        if (item.isShared && typeof window !== 'undefined') {
+        if (itemToSave.isShared && typeof window !== 'undefined') {
           const ownerUid = localStorage.getItem('plantcraft_uid')
           if (ownerUid) {
             import('@/lib/firebase/plant-sync').then(({ syncPlacedItemToFirebase }) => {
-              syncPlacedItemToFirebase(plantId, ownerUid, item).catch(console.warn)
+              syncPlacedItemToFirebase(plantId, ownerUid, itemToSave).catch(console.warn)
             })
           }
         }

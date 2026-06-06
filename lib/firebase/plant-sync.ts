@@ -50,7 +50,7 @@ export async function publishToFirebase(
 
     // Map local PlacedItems to Firebase format
     const sharedItems: SharedPlacedItem[] = (plant.placedItems || [])
-      .filter(item => item.isShared)
+      .filter(item => plant.isPublic || item.isShared)
       .map(item => ({
         id: item.id,
         itemId: item.itemId,

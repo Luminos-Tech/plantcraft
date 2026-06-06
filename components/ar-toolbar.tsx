@@ -1,11 +1,27 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  Crosshair,
+  ImageUp,
+  Lock,
+  ScanLine,
+  Sparkles,
+  Trash2,
+  Unlock,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react'
 import { ShopItem, SHOP_ITEMS, useGameStore, DiagnosisResult } from '@/lib/store'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Spinner } from '@/components/ui/spinner'
 import { diagnosePlant, captureVideoFrame } from '@/lib/ai/diagnose-plant'
+import type { ARFrameState } from '@/lib/filter/filter-engine'
 
 interface ARToolbarProps {
   plantId: string
@@ -13,9 +29,33 @@ interface ARToolbarProps {
   videoRef?: React.RefObject<HTMLVideoElement | null>
   selectedItemId: string | null
   onItemSelected: (itemId: string | null) => void
+  deleteMode: boolean
+  onDeleteModeChange: (mode: boolean) => void
+  arState: ARFrameState
+  onLockAnchor: () => void
+  onUnlockAnchor: () => void
+  onResetAnchor: () => void
+  onScaleAnchor: (factor: number) => void
+  onMoveAnchor: (dxRatio: number, dyRatio: number) => void
+  onAutoFitSelected: () => void
 }
 
-export function ARToolbar({ plantId, onScanComplete, videoRef, selectedItemId, onItemSelected }: ARToolbarProps) {
+export function ARToolbar({
+  plantId,
+  onScanComplete,
+  videoRef,
+  selectedItemId,
+  onItemSelected,
+  deleteMode,
+  onDeleteModeChange,
+  arState,
+  onLockAnchor,
+  onUnlockAnchor,
+  onResetAnchor,
+  onScaleAnchor,
+  onMoveAnchor,
+  onAutoFitSelected,
+}: ARToolbarProps) {
   const [isScanning, setIsScanning] = useState(false)
   const [scanError, setScanError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -23,7 +63,7 @@ export function ARToolbar({ plantId, onScanComplete, videoRef, selectedItemId, o
 
   const plant = plants.find((p) => p.id === plantId)
   const ownedShopItems = SHOP_ITEMS.filter((item) =>
-    ownedItems.some((o) => o.itemId === item.id)
+    ownedItems.some((owned) => owned.itemId === item.id)
   )
 
   const handleScan = async () => {
@@ -33,13 +73,11 @@ export function ARToolbar({ plantId, onScanComplete, videoRef, selectedItemId, o
     try {
       let imageBlob: Blob | null = null
 
-      // Try to capture from video feed first
       if (videoRef?.current && videoRef.current.readyState >= 2) {
         imageBlob = await captureVideoFrame(videoRef.current)
       }
 
       if (!imageBlob) {
-        // Fallback: open file picker
         fileInputRef.current?.click()
         setIsScanning(false)
         return
@@ -49,13 +87,12 @@ export function ARToolbar({ plantId, onScanComplete, videoRef, selectedItemId, o
       const result = await diagnosePlant(imageBlob, plantName)
 
       if (result) {
-        // Store diagnosis in plant state
         if (!result.isHealthy) {
           setPendingDiagnosis(plantId, result)
         }
         onScanComplete(result)
       } else {
-        setScanError('AI could not analyze image. Try again!')
+        setScanError('AI could not analyze image. Try again.')
       }
     } catch {
       setScanError('Connection error. Please try again.')
@@ -64,7 +101,6 @@ export function ARToolbar({ plantId, onScanComplete, videoRef, selectedItemId, o
     }
   }
 
-  // Handle file input fallback
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -82,35 +118,32 @@ export function ARToolbar({ plantId, onScanComplete, videoRef, selectedItemId, o
         }
         onScanComplete(result)
       } else {
-        setScanError('AI could not analyze image. Try again!')
+        setScanError('AI could not analyze image. Try again.')
       }
     } catch {
       setScanError('Connection error. Please try again.')
     } finally {
       setIsScanning(false)
-      // Reset input
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
 
   const handleItemSelect = (item: ShopItem) => {
-    if (selectedItemId === item.id) {
-      onItemSelected(null)
-    } else {
-      onItemSelected(item.id)
-    }
+    if (deleteMode) onDeleteModeChange(false)
+    onItemSelected(selectedItemId === item.id ? null : item.id)
   }
 
+  const toggleDeleteMode = () => {
+    const next = !deleteMode
+    onDeleteModeChange(next)
+    if (next) onItemSelected(null)
+  }
+
+  const selectedItem = selectedItemId ? SHOP_ITEMS.find((item) => item.id === selectedItemId) : null
+  const selectedLabel = selectedItem?.name.replace(/\s+/g, ' ').slice(0, 10)
+
   return (
-    <div
-      className="fixed bottom-0 left-0 right-0 z-[9999]"
-      style={{
-        background: 'rgba(0,0,0,0.35)',
-        backdropFilter: 'blur(4px)',
-        padding: '12px 16px',
-      }}
-    >
-      {/* Hidden file input for fallback photo upload */}
+    <div className="fixed bottom-0 left-0 right-0 z-[9999] border-t border-white/10 bg-black/50 px-3 pb-3 pt-2 backdrop-blur-md">
       <input
         ref={fileInputRef}
         type="file"
@@ -119,101 +152,286 @@ export function ARToolbar({ plantId, onScanComplete, videoRef, selectedItemId, o
         onChange={handleFileSelect}
       />
 
-      {/* Item Carousel */}
-      {ownedShopItems.length > 0 && (
-        <div className="mb-3 flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-          {ownedShopItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => handleItemSelect(item)}
-              className={cn(
-                'flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-sm border-2 transition-all',
-                selectedItemId === item.id
-                  ? 'border-accent bg-accent/20 scale-110'
-                  : 'border-white/30 bg-white/10 hover:border-white/50'
-              )}
-            >
-              <ItemThumb item={item} />
-            </button>
-          ))}
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <StatusPill active={arState.locked} label={arState.locked ? 'LOCK' : arState.detected ? 'VISION' : 'MANUAL'} />
+          {selectedLabel && (
+            <StatusPill active label={selectedLabel} tone="accent" />
+          )}
         </div>
-      )}
 
-      {/* Empty inventory message */}
-      {ownedShopItems.length === 0 && (
-        <p className="mb-3 text-center font-pixel text-[8px] text-white/70">
-          Buy items from Shop to decorate!
-        </p>
-      )}
+        <div className="flex items-center gap-1">
+          <IconButton
+            label="Reset plant frame"
+            onClick={onResetAnchor}
+          >
+            <Crosshair className="h-4 w-4" />
+          </IconButton>
+          <IconButton
+            label={arState.locked ? 'Unlock plant frame' : 'Lock plant frame'}
+            active={arState.locked}
+            onClick={arState.locked ? onUnlockAnchor : onLockAnchor}
+          >
+            {arState.locked ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+          </IconButton>
+        </div>
+      </div>
 
-      {/* Error message */}
-      {scanError && (
-        <p className="mb-2 text-center font-pixel text-[8px] text-red-400">
-          ⚠️ {scanError}
-        </p>
-      )}
+      <div className="mb-2 grid grid-cols-[auto_1fr_auto] items-center gap-2">
+        <div className="grid grid-cols-3 gap-1">
+          <span />
+          <IconButton label="Move frame up" onClick={() => onMoveAnchor(0, -0.035)}>
+            <ArrowUp className="h-3.5 w-3.5" />
+          </IconButton>
+          <span />
+          <IconButton label="Move frame left" onClick={() => onMoveAnchor(-0.035, 0)}>
+            <ArrowLeft className="h-3.5 w-3.5" />
+          </IconButton>
+          <IconButton label="Move frame down" onClick={() => onMoveAnchor(0, 0.035)}>
+            <ArrowDown className="h-3.5 w-3.5" />
+          </IconButton>
+          <IconButton label="Move frame right" onClick={() => onMoveAnchor(0.035, 0)}>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </IconButton>
+        </div>
 
-      {/* Action Buttons */}
-      <div className="grid grid-cols-2 gap-2">
+        <div className="min-w-0 overflow-hidden rounded-sm border border-white/15 bg-black/25 p-1">
+          {ownedShopItems.length > 0 ? (
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              {ownedShopItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => handleItemSelect(item)}
+                  className={cn(
+                    'flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-sm border-2 bg-white/10 transition-all',
+                    selectedItemId === item.id
+                      ? 'scale-105 border-accent bg-accent/25'
+                      : 'border-white/25 hover:border-white/60',
+                    deleteMode && 'pointer-events-none opacity-35'
+                  )}
+                  title={item.name}
+                >
+                  <ItemThumb item={item} />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="flex h-12 items-center justify-center px-3 text-center font-pixel text-[8px] text-white/70">
+              Buy items from Shop to decorate.
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <IconButton label="Make frame larger" onClick={() => onScaleAnchor(1.08)}>
+            <ZoomIn className="h-3.5 w-3.5" />
+          </IconButton>
+          <IconButton label="Make frame smaller" onClick={() => onScaleAnchor(0.92)}>
+            <ZoomOut className="h-3.5 w-3.5" />
+          </IconButton>
+        </div>
+      </div>
+
+      <div className="mb-2 grid grid-cols-[44px_1fr_1fr] gap-2">
+        <IconButton
+          label="Delete placed items"
+          active={deleteMode}
+          danger={deleteMode}
+          onClick={toggleDeleteMode}
+          className="h-10 w-full"
+        >
+          <Trash2 className="h-4 w-4" />
+        </IconButton>
+
+        <Button
+          onClick={onAutoFitSelected}
+          disabled={!selectedItemId || deleteMode}
+          variant="outline"
+          className="h-10 rounded-sm border-white/25 bg-white/10 font-pixel text-[8px] text-white hover:bg-white/20 disabled:opacity-40"
+          title="Place selected item at its default plant position"
+        >
+          <Sparkles className="h-4 w-4" />
+          Fit
+        </Button>
+
         <Button
           onClick={handleScan}
           disabled={isScanning}
-          className="rounded-sm bg-primary font-pixel text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-70"
+          className="h-10 rounded-sm bg-primary font-pixel text-[8px] text-primary-foreground hover:bg-primary/90 disabled:opacity-70"
+          title="Scan plant health"
         >
-          {isScanning ? <Spinner className="h-4 w-4" /> : <span>🔍 Scan Plant</span>}
-        </Button>
-        
-        <Button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isScanning}
-          variant="outline"
-          className="rounded-sm border-2 border-primary bg-background/50 text-white font-pixel text-xs hover:bg-primary/20 disabled:opacity-70"
-        >
-          {isScanning ? <Spinner className="h-4 w-4" /> : <span>📁 Upload Pic</span>}
+          {isScanning ? <Spinner className="h-4 w-4" /> : <ScanLine className="h-4 w-4" />}
+          Scan
         </Button>
       </div>
 
-      {/* Hint Text */}
-      <p className="mt-2 text-center font-pixel text-[6px] text-white/50">
-        Select item to place • Point camera at leaf to scan
-      </p>
+      <Button
+        onClick={() => fileInputRef.current?.click()}
+        disabled={isScanning}
+        variant="outline"
+        className="h-9 w-full rounded-sm border-white/20 bg-black/25 font-pixel text-[8px] text-white hover:bg-white/10 disabled:opacity-70"
+      >
+        <ImageUp className="h-4 w-4" />
+        Upload Photo
+      </Button>
+
+      {scanError && (
+        <p className="mt-2 text-center font-pixel text-[8px] text-red-300">
+          {scanError}
+        </p>
+      )}
     </div>
   )
 }
 
-// Small item thumbnail
-function ItemThumb({ item }: { item: ShopItem }) {
-  const getItemColor = () => {
-    switch (item.category) {
-      case 'hat': return '#E8C547'
-      case 'glasses': return '#5C8A3C'
-      case 'block': return '#8B7355'
-      case 'vfx': return '#A855F7'
-      default: return '#5C8A3C'
-    }
-  }
-
+function IconButton({
+  label,
+  active,
+  danger,
+  className,
+  onClick,
+  children,
+}: {
+  label: string
+  active?: boolean
+  danger?: boolean
+  className?: string
+  onClick: () => void
+  children: ReactNode
+}) {
   return (
-    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-      {item.category === 'hat' && (
-        <>
-          <rect x="10" y="16" width="12" height="3" fill={getItemColor()} />
-          <rect x="12" y="13" width="8" height="3" fill={getItemColor()} />
-        </>
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className={cn(
+        'flex h-8 w-8 items-center justify-center rounded-sm border transition-all',
+        active
+          ? danger
+            ? 'border-red-400 bg-red-500/35 text-red-50'
+            : 'border-accent bg-accent/25 text-accent'
+          : 'border-white/20 bg-white/10 text-white hover:border-white/45 hover:bg-white/15',
+        className
       )}
-      {item.category === 'glasses' && (
-        <>
-          <rect x="6" y="14" width="8" height="6" fill={getItemColor()} />
-          <rect x="18" y="14" width="8" height="6" fill={getItemColor()} />
-          <rect x="14" y="16" width="4" height="2" fill={getItemColor()} />
-        </>
+    >
+      {children}
+    </button>
+  )
+}
+
+function StatusPill({ label, active, tone = 'primary' }: { label: string; active?: boolean; tone?: 'primary' | 'accent' }) {
+  return (
+    <span
+      className={cn(
+        'rounded-sm border px-2 py-1 font-pixel text-[7px]',
+        active
+          ? tone === 'accent'
+            ? 'border-accent/70 bg-accent/20 text-accent'
+            : 'border-emerald-300/70 bg-emerald-400/15 text-emerald-100'
+          : 'border-white/20 bg-white/10 text-white/60'
       )}
-      {item.category === 'block' && (
-        <rect x="10" y="10" width="12" height="12" fill={getItemColor()} />
-      )}
-      {item.category === 'vfx' && (
-        <circle cx="16" cy="16" r="6" fill={getItemColor()} opacity="0.7" />
-      )}
+    >
+      {label}
+    </span>
+  )
+}
+
+function ItemThumb({ item }: { item: ShopItem }) {
+  if (item.id === 'hat-crown') return <CrownThumb />
+  if (item.category === 'hat') return <HatThumb />
+  if (item.id === 'glasses-heart') return <HeartGlassesThumb />
+  if (item.category === 'glasses') return <GlassesThumb />
+  if (item.id === 'block-diamond') return <DiamondThumb />
+  if (item.id === 'vfx-rainbow') return <RainbowThumb />
+  if (item.category === 'vfx') return <SparkleThumb />
+  return <DirtThumb />
+}
+
+function HatThumb() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true">
+      <rect x="5" y="18" width="22" height="5" fill="#B88422" />
+      <rect x="8" y="12" width="16" height="8" fill="#E8C547" />
+      <rect x="9" y="16" width="14" height="3" fill="#5C8A3C" />
+    </svg>
+  )
+}
+
+function CrownThumb() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true">
+      <rect x="7" y="17" width="18" height="7" fill="#C79218" />
+      <rect x="8" y="10" width="5" height="9" fill="#F7D14A" />
+      <rect x="14" y="7" width="5" height="12" fill="#F7D14A" />
+      <rect x="20" y="10" width="5" height="9" fill="#F7D14A" />
+      <rect x="10" y="19" width="3" height="3" fill="#69D2E7" />
+      <rect x="15" y="19" width="3" height="3" fill="#E84A5F" />
+      <rect x="20" y="19" width="3" height="3" fill="#69D2E7" />
+    </svg>
+  )
+}
+
+function GlassesThumb() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true">
+      <rect x="4" y="12" width="10" height="8" fill="#111827" />
+      <rect x="18" y="12" width="10" height="8" fill="#111827" />
+      <rect x="14" y="15" width="4" height="2" fill="#111827" />
+      <rect x="6" y="14" width="5" height="2" fill="#4DD0E1" />
+      <rect x="20" y="14" width="5" height="2" fill="#4DD0E1" />
+    </svg>
+  )
+}
+
+function HeartGlassesThumb() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true">
+      <path d="M5 12h4v-3h5v3h3v5h-3v3h-3v3H8v-3H5z" fill="#E84A5F" />
+      <path d="M17 12h3v-3h5v3h4v8h-3v3h-3v-3h-3v-3h-3z" fill="#E84A5F" />
+      <rect x="14" y="15" width="4" height="2" fill="#7A2633" />
+    </svg>
+  )
+}
+
+function DirtThumb() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true">
+      <rect x="8" y="8" width="16" height="16" fill="#8B5A2B" />
+      <rect x="8" y="8" width="16" height="6" fill="#5C8A3C" />
+      <rect x="11" y="16" width="4" height="3" fill="#6B4226" />
+      <rect x="17" y="18" width="5" height="3" fill="#A06A36" />
+    </svg>
+  )
+}
+
+function DiamondThumb() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true">
+      <rect x="8" y="8" width="16" height="16" fill="#38BDF8" />
+      <rect x="10" y="10" width="12" height="5" fill="#A5F3FC" />
+      <rect x="11" y="17" width="5" height="5" fill="#67E8F9" />
+      <rect x="17" y="17" width="5" height="5" fill="#0891B2" />
+    </svg>
+  )
+}
+
+function SparkleThumb() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true">
+      <rect x="14" y="5" width="4" height="22" fill="#F9E66B" />
+      <rect x="5" y="14" width="22" height="4" fill="#F9E66B" />
+      <rect x="13" y="13" width="6" height="6" fill="#FFFFFF" />
+    </svg>
+  )
+}
+
+function RainbowThumb() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true">
+      <path d="M6 20a10 10 0 0 1 20 0" fill="none" stroke="#E84A5F" strokeWidth="3" />
+      <path d="M9 20a7 7 0 0 1 14 0" fill="none" stroke="#F9E66B" strokeWidth="3" />
+      <path d="M12 20a4 4 0 0 1 8 0" fill="none" stroke="#4DD0E1" strokeWidth="3" />
     </svg>
   )
 }

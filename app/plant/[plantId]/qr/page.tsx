@@ -20,6 +20,8 @@ export default function PlantQRPage({ params }: PageProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
   const [isPublic, setIsPublic] = useState(plant?.isPublic ?? false)
   const [isToggling, setIsToggling] = useState(false)
+  const [shareError, setShareError] = useState<string | null>(null)
+  const [shareNotice, setShareNotice] = useState<string | null>(null)
   const [ownerUid] = useState(() => {
     // Generate a persistent anonymous UID for this device
     if (typeof window === 'undefined') return 'anon'
@@ -75,26 +77,41 @@ export default function PlantQRPage({ params }: PageProps) {
   const handleTogglePublic = async () => {
     if (!plant) return
     setIsToggling(true)
+    setShareError(null)
+    setShareNotice(null)
 
     try {
       const newPublicState = !isPublic
 
       if (newPublicState) {
         const hp = getPlantHp(plant.id)
-        const success = await publishToFirebase(plant, ownerUid, hp)
+        const publicPlant = {
+          ...plant,
+          isPublic: true,
+          placedItems: (plant.placedItems || []).map((item) => ({
+            ...item,
+            isShared: true,
+          })),
+        }
+        const success = await publishToFirebase(publicPlant, ownerUid, hp)
         if (success) {
           setIsPublic(true)
           setPlantPublic(plant.id, true)
+        } else {
+          setShareError('Could not enable sharing. Check Firebase configuration or network.')
         }
       } else {
         const success = await unpublishFromFirebase(plant.id, ownerUid)
         if (success) {
           setIsPublic(false)
           setPlantPublic(plant.id, false)
+        } else {
+          setShareError('Could not disable sharing. Check Firebase configuration or network.')
         }
       }
     } catch (error) {
       console.error('Toggle public error:', error)
+      setShareError('Sharing failed. Please try again.')
     } finally {
       setIsToggling(false)
     }
@@ -126,6 +143,10 @@ export default function PlantQRPage({ params }: PageProps) {
   }
 
   const hp = getPlantHp(plant.id)
+  const placedItemCount = plant.placedItems?.length ?? 0
+  const shareUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/scan-friend?ownerUid=${encodeURIComponent(ownerUid)}&plantId=${encodeURIComponent(plant.id)}`
+    : ''
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
@@ -136,7 +157,7 @@ export default function PlantQRPage({ params }: PageProps) {
           <span className="text-3xl">🌿</span>
           <h2 className="mt-2 font-pixel text-sm text-foreground">{plant.name}</h2>
           <p className="mt-1 font-pixel text-[8px] text-muted-foreground">
-            HP: {hp}/100 • Items: {plant.equippedItems.length}
+            HP: {hp}/100 • Items: {placedItemCount}
           </p>
         </div>
 
@@ -184,9 +205,28 @@ export default function PlantQRPage({ params }: PageProps) {
           </button>
         </div>
 
+        {shareError && (
+          <p className="mt-3 rounded-sm border border-destructive/30 bg-destructive/10 px-3 py-2 text-left text-xs text-destructive">
+            {shareError}
+          </p>
+        )}
+
+        {shareNotice && (
+          <p className="mt-3 rounded-sm border border-primary/25 bg-primary/10 px-3 py-2 text-left text-xs text-primary">
+            {shareNotice}
+          </p>
+        )}
+
+        {isPublic && shareUrl && (
+          <div className="mt-4 rounded-sm border border-primary/25 bg-primary/5 p-3 text-left">
+            <p className="font-pixel text-[8px] text-primary">Friend Link</p>
+            <p className="mt-1 break-all text-[10px] text-muted-foreground">{shareUrl}</p>
+          </div>
+        )}
+
         {/* Instructions */}
         <p className="mt-4 text-xs text-muted-foreground">
-          Print this QR and attach to your plant pot for friends to scan!
+          Friends can scan this QR or open the share link after Public Mode is enabled.
         </p>
       </div>
 
@@ -208,16 +248,23 @@ export default function PlantQRPage({ params }: PageProps) {
           </Button>
         )}
         <Button
-          onClick={() => {
+          disabled={!isPublic}
+          onClick={async () => {
+            if (!shareUrl || !plant) return
+            setShareNotice(null)
             if (navigator.share) {
-              navigator.share({
+              await navigator.share({
                 title: `View ${plant.name} on PlantCraft!`,
-                text: `Scan QR to view ${plant.name} in AR!`,
-                url: window.location.href,
+                text: `Open this PlantCraft share to add ${plant.name} to your Friend's Garden.`,
+                url: shareUrl,
               })
+            } else {
+              await navigator.clipboard?.writeText(shareUrl)
+              setShareNotice('Share link copied to clipboard.')
             }
           }}
-          className="rounded-sm bg-primary font-pixel text-xs text-primary-foreground"
+          title={isPublic ? 'Share friend link' : 'Enable sharing first'}
+          className="rounded-sm bg-primary font-pixel text-xs text-primary-foreground disabled:opacity-50"
         >
           📤 Share
         </Button>

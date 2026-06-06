@@ -59,6 +59,6 @@ export async function captureVideoFrame(videoElement: HTMLVideoElement): Promise
   ctx.drawImage(videoElement, 0, 0)
 
   return new Promise((resolve) => {
-    canvas.toBlob((blob) => resolve(blob!), 'image/jpeg', 0.8)
+    canvas.toBlob((blob) => resolve(blob!), 'image/jpeg', 0.92)
   })
 }

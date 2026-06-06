@@ -1,14 +1,16 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { Suspense, useState, useRef, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { subscribeToPlant, type PublicPlantData, type QRPayload } from '@/lib/firebase/plant-sync'
 import { useGameStore } from '@/lib/store'
 import { FriendPlantCard } from '@/components/friend-plant-card'
 
-type ScanState = 'idle' | 'scanning' | 'detected' | 'error'
+type ScanState = 'idle' | 'scanning' | 'loading' | 'detected' | 'error'
 
-export default function ScanFriendPage() {
+function ScanFriendContent() {
+  const searchParams = useSearchParams()
   const [scanState, setScanState] = useState<ScanState>('idle')
   const [plantData, setPlantData] = useState<PublicPlantData | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -20,24 +22,24 @@ export default function ScanFriendPage() {
   const scanIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const unsubscribeRef = useRef<(() => void) | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const jsQRRef = useRef<((data: Uint8ClampedArray, w: number, h: number, opts?: { inversionAttempts?: string }) => { data: string } | null) | null>(null)
 
   const { friendPlants, addFriendPlant } = useGameStore()
 
-  // ─── Camera helpers ────────────────────────────────────────────────────────
+  // ─── Pre-load jsQR library ─────────────────────────────────────────────────
 
-  const startCamera = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+  useEffect(() => {
+    import('jsqr' as string)
+      .then((mod: { default?: unknown }) => {
+        jsQRRef.current = (mod.default ?? mod) as typeof jsQRRef.current
+        console.log('[PlantCraft] jsQR loaded successfully')
       })
-      streamRef.current = stream
-      setScanState('scanning')
-      startQRScanning()
-    } catch {
-      setErrorMsg('Unable to open camera. Please grant camera permissions.')
-      setScanState('error')
-    }
+      .catch((err: unknown) => {
+        console.error('[PlantCraft] Failed to load jsQR:', err)
+      })
   }, [])
+
+  // ─── Camera helpers ────────────────────────────────────────────────────────
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -50,12 +52,50 @@ export default function ScanFriendPage() {
     }
   }, [])
 
-  // Attach stream to video element when scanning starts
-  useEffect(() => {
-    if (scanState === 'scanning' && scanVideoRef.current && streamRef.current) {
-      scanVideoRef.current.srcObject = streamRef.current
+  const startCamera = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 960 },
+          height: { ideal: 540 },
+          frameRate: { ideal: 24, max: 30 },
+        },
+      })
+      streamRef.current = stream
+
+      // Attach stream directly to video — don't rely on useEffect
+      const video = scanVideoRef.current
+      if (video) {
+        video.srcObject = stream
+        try {
+          await video.play()
+        } catch (playErr) {
+          console.warn('[PlantCraft] video.play() failed, relying on autoPlay:', playErr)
+        }
+      }
+
+      setScanState('scanning')
+
+      // Wait for video to be ready before starting QR scanning
+      if (video) {
+        const onReady = () => {
+          video.removeEventListener('loadeddata', onReady)
+          startQRScanning()
+        }
+        if (video.readyState >= 2) {
+          startQRScanning()
+        } else {
+          video.addEventListener('loadeddata', onReady)
+        }
+      }
+    } catch (err) {
+      console.error('[PlantCraft] Camera error:', err)
+      setErrorMsg('Unable to open camera. Please grant camera permissions.')
+      setScanState('error')
     }
-  }, [scanState])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -68,7 +108,19 @@ export default function ScanFriendPage() {
   // ─── Process detected QR payload ──────────────────────────────────────────
 
   const processPayload = useCallback(async (payload: QRPayload) => {
+    if (!payload.ownerUid || !payload.plantId) {
+      setErrorMsg('This PlantCraft share is missing plant information.')
+      setScanState('error')
+      return
+    }
+
     setDetectedPayload(payload)
+    setErrorMsg(null)
+    setPlantData(null)
+    setScanState('loading')
+    unsubscribeRef.current?.()
+    unsubscribeRef.current = null
+    stopCamera() // Stop camera after successful detection
 
     const unsub = await subscribeToPlant(payload.ownerUid, payload.plantId, (data) => {
       if (data) {
@@ -96,7 +148,20 @@ export default function ScanFriendPage() {
       setScanState('detected')
       addFriendPlant(payload.ownerUid, payload.plantId, demoData)
     }
-  }, [addFriendPlant])
+  }, [addFriendPlant, stopCamera])
+
+  useEffect(() => {
+    const ownerUid = searchParams.get('ownerUid')
+    const plantId = searchParams.get('plantId')
+    if (!ownerUid || !plantId || detectedPayload) return
+
+    processPayload({
+      app: 'plantcraft',
+      ownerUid,
+      plantId,
+      version: 1,
+    })
+  }, [detectedPayload, processPayload, searchParams])
 
   // ─── QR Scanning via camera ───────────────────────────────────────────────
 
@@ -104,9 +169,17 @@ export default function ScanFriendPage() {
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')!
 
-    scanIntervalRef.current = setInterval(async () => {
+    console.log('[PlantCraft] QR scanning started')
+
+    scanIntervalRef.current = setInterval(() => {
       const video = scanVideoRef.current
-      if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) return
+      if (!video || video.readyState < video.HAVE_ENOUGH_DATA) return
+
+      const jsQR = jsQRRef.current
+      if (!jsQR) {
+        console.warn('[PlantCraft] jsQR not loaded yet, waiting...')
+        return
+      }
 
       canvas.width = video.videoWidth
       canvas.height = video.videoHeight
@@ -114,29 +187,34 @@ export default function ScanFriendPage() {
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
 
       try {
-        let jsQR: ((data: Uint8ClampedArray, w: number, h: number, opts?: { inversionAttempts?: string }) => { data: string } | null) | null = null
-        try {
-          jsQR = (await import('jsqr' as string) as { default: typeof jsQR }).default
-        } catch { return }
-        if (!jsQR) return
-
-        const qrResult = jsQR(imageData.data, canvas.width, canvas.height, { inversionAttempts: 'dontInvert' })
+        // Try both normal and inverted QR detection for better results
+        let qrResult = jsQR(imageData.data, canvas.width, canvas.height, { inversionAttempts: 'dontInvert' })
+        if (!qrResult) {
+          qrResult = jsQR(imageData.data, canvas.width, canvas.height, { inversionAttempts: 'attemptBoth' })
+        }
         if (!qrResult) return
 
-        const payload = JSON.parse(qrResult.data) as QRPayload
+        let payload: QRPayload
+        try {
+          payload = JSON.parse(qrResult.data) as QRPayload
+        } catch {
+          return // Not valid JSON — continue scanning
+        }
         if (payload.app !== 'plantcraft' || !payload.plantId) return
 
-        // Stop scan loop but keep camera alive
+        console.log('[PlantCraft] QR detected:', payload)
+
+        // Stop scan loop
         if (scanIntervalRef.current) {
           clearInterval(scanIntervalRef.current)
           scanIntervalRef.current = null
         }
 
-        await processPayload(payload)
+        processPayload(payload)
       } catch {
         // Not a PlantCraft QR — continue scanning
       }
-    }, 300)
+    }, 250) // Scan faster: every 250ms instead of 300ms
   }
 
   // ─── QR from image upload ─────────────────────────────────────────────────
@@ -158,16 +236,26 @@ export default function ScanFriendPage() {
       ctx.drawImage(bitmap, 0, 0)
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
 
-      let jsQR: ((data: Uint8ClampedArray, w: number, h: number, opts?: { inversionAttempts?: string }) => { data: string } | null) | null = null
-      try {
-        jsQR = (await import('jsqr' as string) as { default: typeof jsQR }).default
-      } catch {
+      // Use pre-loaded jsQR, or try loading again if not available
+      let jsQR = jsQRRef.current
+      if (!jsQR) {
+        try {
+          const mod = await import('jsqr' as string) as { default?: unknown }
+          jsQR = (mod.default ?? mod) as typeof jsQRRef.current
+          if (jsQR) jsQRRef.current = jsQR
+        } catch {
+          setErrorMsg('QR scanning library not available.')
+          setIsProcessingUpload(false)
+          return
+        }
+      }
+      if (!jsQR) {
         setErrorMsg('QR scanning library not available.')
         setIsProcessingUpload(false)
         return
       }
 
-      const qrResult = jsQR!(imageData.data, canvas.width, canvas.height, { inversionAttempts: 'attemptBoth' })
+      const qrResult = jsQR(imageData.data, canvas.width, canvas.height, { inversionAttempts: 'attemptBoth' })
       if (!qrResult) {
         setErrorMsg('No QR code found in the image. Try a clearer photo.')
         setScanState('error')
@@ -282,6 +370,11 @@ export default function ScanFriendPage() {
 
               <p className="mt-2 font-pixel text-[8px] text-primary">✅ Added to Friend&apos;s Garden!</p>
             </div>
+          </div>
+        ) : scanState === 'loading' ? (
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+            <span className="text-4xl animate-spin">⚙️</span>
+            <p className="font-pixel text-[10px] text-muted-foreground">Loading shared plant...</p>
           </div>
         ) : scanState === 'error' ? (
           <div className="flex h-full flex-col items-center justify-center p-6 text-center">
@@ -405,11 +498,23 @@ export default function ScanFriendPage() {
         <h3 className="font-pixel text-[10px] text-foreground">How to use:</h3>
         <ul className="mt-2 space-y-1.5 text-xs text-muted-foreground">
           <li className="flex gap-2"><span className="text-accent">1.</span> Ask friend to open their plant&apos;s QR page</li>
-          <li className="flex gap-2"><span className="text-accent">2.</span> Scan QR with camera or upload an image</li>
+          <li className="flex gap-2"><span className="text-accent">2.</span> Scan QR, upload QR image, or open their share link</li>
           <li className="flex gap-2"><span className="text-accent">3.</span> Plant is saved to your Friend&apos;s Garden</li>
           <li className="flex gap-2"><span className="text-accent">4.</span> Tap <span className="font-pixel text-[8px] text-accent">🔮 View in AR</span> to see their decorations live!</li>
         </ul>
       </div>
     </div>
+  )
+}
+
+export default function ScanFriendPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-full items-center justify-center font-pixel text-xs">
+        Loading...
+      </div>
+    }>
+      <ScanFriendContent />
+    </Suspense>
   )
 }
