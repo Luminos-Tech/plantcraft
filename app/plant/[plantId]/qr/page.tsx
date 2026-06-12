@@ -156,6 +156,11 @@ export default function PlantQRPage({ params }: PageProps) {
         <div className="mb-4">
           <span className="text-3xl">🌿</span>
           <h2 className="mt-2 font-pixel text-sm text-foreground">{plant.name}</h2>
+          {plant.description && (
+            <p className="mx-auto mt-2 max-w-xs text-xs leading-relaxed text-muted-foreground">
+              {plant.description}
+            </p>
+          )}
           <p className="mt-1 font-pixel text-[8px] text-muted-foreground">
             HP: {hp}/100 • Items: {placedItemCount}
           </p>

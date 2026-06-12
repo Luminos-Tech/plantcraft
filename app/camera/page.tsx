@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback, Suspense } from 'react'
+import { ArrowLeft, Camera as CameraIcon, Leaf } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useGameStore, DiagnosisResult, PlacedItem, ITEM_DEFAULT_ANCHOR, SHOP_ITEMS } from '@/lib/store'
 import { ARPlantHUD } from '@/components/ar-plant-hud'
@@ -43,7 +44,7 @@ function CameraContent() {
   const [deleteMode, setDeleteMode] = useState(false)
   const [arState, setArState] = useState<ARFrameState>(DEFAULT_AR_STATE)
 
-  const { plants, friendPlants, savePlacedItem, removePlacedItem, addCareLog } = useGameStore()
+  const { plants, friendPlants, savePlacedItem, removePlacedItem, addCareLog, updateFriendPlant } = useGameStore()
   const plant = plants.find((p) => p.id === plantId)
   const selectedItem = selectedItemId ? SHOP_ITEMS.find((item) => item.id === selectedItemId) : null
 
@@ -60,6 +61,7 @@ function CameraContent() {
     if (local) {
       setFriendData({
         name: local.name,
+        description: local.description,
         hp: local.hp,
         placedItems: local.placedItems,
         lastUpdated: local.lastUpdated,
@@ -68,11 +70,24 @@ function CameraContent() {
 
     let unsub: (() => void) | null = null
     subscribeToPlant(friendOwner!, friendPlantId!, (data) => {
-      if (data) setFriendData(data)
+      if (!data) return
+      setFriendData(data)
+      const current = useGameStore.getState().friendPlants.find(
+        (friend) => friend.ownerUid === friendOwner && friend.plantId === friendPlantId
+      )
+      if (current) {
+        updateFriendPlant(current.id, {
+          name: data.name,
+          description: data.description,
+          hp: data.hp,
+          placedItems: data.placedItems ?? [],
+          lastUpdated: data.lastUpdated,
+        })
+      }
     }).then((u) => { unsub = u })
 
     return () => { unsub?.() }
-  }, [isFriendMode, friendOwner, friendPlantId, friendPlants])
+  }, [isFriendMode, friendOwner, friendPlantId, friendPlants, updateFriendPlant])
 
   useEffect(() => {
     if (!videoRef.current || !canvasRef.current) return
@@ -187,6 +202,7 @@ function CameraContent() {
     if (!engine) return null
     const state = engine.getState()
     if (state.locked) return state
+    if (!state.anchor || !state.detected) return null
     const nextState = engine.lockAnchor()
     setArState(nextState)
     return nextState
@@ -214,7 +230,8 @@ function CameraContent() {
 
   const handleAutoFitSelected = useCallback(() => {
     if (!selectedItemId) return
-    ensureLockedAnchor()
+    const lockedState = ensureLockedAnchor()
+    if (!lockedState) return
 
     const category = getItemCategory(selectedItemId)
     const defaults = ITEM_DEFAULT_ANCHOR[category] ?? ITEM_DEFAULT_ANCHOR.block
@@ -228,7 +245,8 @@ function CameraContent() {
     if (!deleteMode && !selectedItemId) return
 
     e.preventDefault()
-    ensureLockedAnchor()
+    const lockedState = ensureLockedAnchor()
+    if (!lockedState) return
 
     const bbox = engineRef.current.getLastBbox()
     if (!bbox || !canvasRef.current) return
@@ -274,23 +292,23 @@ function CameraContent() {
         <h1 className="mb-6 text-center font-pixel text-lg text-foreground">Select a Plant for AR</h1>
         {plants.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center">
-            <p className="font-pixel text-xs text-muted-foreground">Your garden is empty.</p>
-            <Button onClick={() => router.push('/dashboard')} className="mt-4 font-pixel text-xs">
-              Go to Garden
+            <Leaf className="h-10 w-10 text-muted-foreground" />
+            <p className="mt-3 font-pixel text-xs text-muted-foreground">Your garden is empty.</p>
+            <Button onClick={() => router.push('/dashboard')} className="mt-4 rounded-md font-pixel text-xs">
+              <ArrowLeft className="h-4 w-4" /> Go to Garden
             </Button>
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="mx-auto flex w-full max-w-lg flex-col gap-3">
             {plants.map((p) => (
-              <Button
+              <button
                 key={p.id}
-                variant="outline"
-                className="h-16 justify-start px-4 font-pixel text-xs"
+                className="card-hover flex h-16 items-center gap-3 rounded-lg border-2 border-border bg-card/95 px-4 font-pixel text-xs text-foreground transition-all hover:border-primary"
                 onClick={() => router.push(`/camera?plantId=${p.id}`)}
               >
-                <span className="mr-3 text-2xl">🌱</span>
-                {p.name}
-              </Button>
+                <Leaf className="h-5 w-5 text-primary" />
+                <span className="truncate">{p.name}</span>
+              </button>
             ))}
           </div>
         )}
@@ -301,10 +319,10 @@ function CameraContent() {
   if (plantId && !plant && !isFriendMode) {
     return (
       <div className="flex h-screen flex-col items-center justify-center bg-background p-4">
-        <span className="text-4xl">❓</span>
+        <Leaf className="h-10 w-10 text-muted-foreground" />
         <h1 className="mt-4 font-pixel text-sm text-foreground">Plant not found</h1>
-        <Button onClick={() => router.push('/dashboard')} className="mt-6 rounded-sm font-pixel text-xs">
-          Back to Garden
+        <Button onClick={() => router.push('/dashboard')} className="mt-6 rounded-md font-pixel text-xs">
+          <ArrowLeft className="h-4 w-4" /> Back to Garden
         </Button>
       </div>
     )
@@ -390,11 +408,11 @@ function CameraContent() {
 
       {isReady && cameraError && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-background p-6 text-center">
-          <span className="text-4xl">📷</span>
+          <CameraIcon className="h-10 w-10 text-muted-foreground" />
           <h1 className="mt-4 font-pixel text-sm text-foreground">Camera Error</h1>
           <p className="mt-3 max-w-xs text-sm text-muted-foreground">{cameraError}</p>
-          <Button onClick={() => router.push('/dashboard')} className="mt-6 rounded-sm font-pixel text-xs">
-            Back to Garden
+          <Button onClick={() => router.push('/dashboard')} className="mt-6 rounded-md font-pixel text-xs">
+            <ArrowLeft className="h-4 w-4" /> Back to Garden
           </Button>
         </div>
       )}
@@ -436,19 +454,20 @@ function FriendHUD({ friendData, onClose }: { friendData: PublicPlantData | null
   const hpColor = hp >= 70 ? '#4CAF50' : hp >= 40 ? '#FFC107' : '#F44336'
 
   return (
-    <div className="fixed left-0 right-0 top-0 z-[9999] bg-black/35 p-3 backdrop-blur-sm">
+    <div className="fixed left-0 right-0 top-0 z-[9999] bg-black/35 p-3 backdrop-blur-sm" style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}>
       <div className="flex items-center gap-3">
-        <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-sm text-white hover:bg-white/20">
-          ×
+        <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-md text-white hover:bg-white/20">
+          <ArrowLeft className="h-4 w-4" />
         </button>
-        <div className="flex-1 text-center font-pixel text-[10px] text-white">
-          🌿 {friendData?.name || 'Friend Plant'}
+        <div className="flex flex-1 items-center justify-center gap-1.5 font-pixel text-[10px] text-white">
+          <Leaf className="h-3.5 w-3.5" />
+          {friendData?.name || 'Friend Plant'}
         </div>
         <div className="font-pixel text-[8px] font-bold" style={{ color: hpColor }}>
           ♥ {hp}
         </div>
       </div>
-      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/20">
+      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-white/20">
         <div
           className="h-full rounded-full transition-all duration-500"
           style={{ width: `${hp}%`, background: hpColor }}
@@ -469,6 +488,7 @@ function ARStatusOverlay({
   selectedItemName: string | null
   isFriendMode: boolean
 }) {
+  const isReady = arState.locked || arState.detected
   const statusText = arState.locked
     ? 'Anchor locked'
     : arState.detected
@@ -480,11 +500,18 @@ function ARStatusOverlay({
       ? 'Tap item to remove'
       : selectedItemName
         ? `Tap plant or Fit ${selectedItemName}`
-        : 'Lock frame, then decorate'
+        : 'Find plant, then decorate'
 
   return (
-    <div className="pointer-events-none fixed left-1/2 top-[112px] z-[9998] w-[min(88vw,360px)] -translate-x-1/2 rounded-sm border border-white/15 bg-black/45 px-3 py-2 text-center shadow-lg backdrop-blur-sm">
-      <div className="font-pixel text-[8px] uppercase tracking-normal text-white/70">
+    <div
+      className="pointer-events-none fixed left-1/2 top-[100px] z-[9998] w-[min(88vw,360px)] -translate-x-1/2 rounded-md border px-4 py-2.5 text-center shadow-lg backdrop-blur-sm transition-colors"
+      style={{
+        borderColor: isReady ? 'rgba(53, 233, 130, 0.78)' : 'rgba(255, 255, 255, 0.15)',
+        background: isReady ? 'rgba(10, 52, 32, 0.62)' : 'rgba(0, 0, 0, 0.5)',
+        boxShadow: isReady ? '0 0 22px rgba(53, 233, 130, 0.24)' : undefined,
+      }}
+    >
+      <div className="font-pixel text-[8px] uppercase tracking-normal" style={{ color: isReady ? '#35E982' : 'rgba(255,255,255,0.7)' }}>
         {statusText}
       </div>
       <div className="mt-1 font-pixel text-[9px] text-white">

@@ -3,67 +3,67 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* PlantCraft Theme - Cottagecore Minimal × Minecraft Pixel */
+/* PlantCraft Theme - lively garden UI with pixel accents */
 :root {
   /* Core Colors */
-  --background: #F5F0E8; /* Cream - warm, natural feel */
-  --foreground: #2D2D2D; /* Dark charcoal for text */
+  --background: #EEF8F1;
+  --foreground: #1E2F25;
   --card: #FFFFFF;
-  --card-foreground: #2D2D2D;
+  --card-foreground: #1E2F25;
   --popover: #FFFFFF;
-  --popover-foreground: #2D2D2D;
+  --popover-foreground: #1E2F25;
   
-  /* Primary: Forest Green */
-  --primary: #5C8A3C;
+  /* Primary: Leaf Green */
+  --primary: #2F8F5B;
   --primary-foreground: #FFFFFF;
   
-  /* Secondary: Soft cream */
-  --secondary: #EDE8DD;
-  --secondary-foreground: #2D2D2D;
+  /* Secondary: Fresh mint */
+  --secondary: #DFF3E7;
+  --secondary-foreground: #1E2F25;
   
   /* Muted */
-  --muted: #E8E3D9;
-  --muted-foreground: #6B6B6B;
+  --muted: #E7EFE9;
+  --muted-foreground: #64746B;
   
-  /* Accent: Pixel Yellow */
-  --accent: #E8C547;
-  --accent-foreground: #2D2D2D;
+  /* Accent: Warm Sun */
+  --accent: #F6C35B;
+  --accent-foreground: #2E2514;
   
   /* Status Colors */
   --destructive: #E74C3C;
   --destructive-foreground: #FFFFFF;
-  --success: #4CAF50;
-  --warning: #FFC107;
+  --success: #3FAE67;
+  --warning: #F6C35B;
   
   /* UI Elements */
-  --border: #D4CFC4;
-  --input: #EDE8DD;
-  --ring: #5C8A3C;
+  --border: #C9DDD0;
+  --input: #F6FBF8;
+  --ring: #2F8F5B;
   
   /* HP Bar Colors */
-  --hp-high: #4CAF50;
-  --hp-medium: #FFC107;
+  --hp-high: #3FAE67;
+  --hp-medium: #F6C35B;
   --hp-low: #F44336;
   
   /* Chart Colors */
-  --chart-1: #5C8A3C;
-  --chart-2: #E8C547;
-  --chart-3: #8B7355;
-  --chart-4: #6B8E4E;
-  --chart-5: #D4A84B;
+  --chart-1: #2F8F5B;
+  --chart-2: #F6C35B;
+  --chart-3: #6BA6FF;
+  --chart-4: #E06B5F;
+  --chart-5: #8A6FE8;
   
-  /* Minecraft-style square corners */
-  --radius: 4px;
+  /* Refined radius — pixel-ish but modern */
+  --radius: 6px;
   
   /* Sidebar */
-  --sidebar: #EDE8DD;
-  --sidebar-foreground: #2D2D2D;
-  --sidebar-primary: #5C8A3C;
+  --sidebar: #F7FCF9;
+  --sidebar-foreground: #1E2F25;
+  --sidebar-primary: #2F8F5B;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #E8C547;
-  --sidebar-accent-foreground: #2D2D2D;
-  --sidebar-border: #D4CFC4;
-  --sidebar-ring: #5C8A3C;
+  --sidebar-accent: #F6C35B;
+  --sidebar-accent-foreground: #2E2514;
+  --sidebar-border: #C9DDD0;
+  --sidebar-ring: #2F8F5B;
 }
 
 .dark {
@@ -73,24 +73,24 @@
   --card-foreground: #F5F0E8;
   --popover: #242424;
   --popover-foreground: #F5F0E8;
-  --primary: #6B9B4B;
+  --primary: #4DBA78;
   --primary-foreground: #FFFFFF;
-  --secondary: #2D2D2D;
+  --secondary: #26362D;
   --secondary-foreground: #F5F0E8;
   --muted: #333333;
   --muted-foreground: #A0A0A0;
-  --accent: #E8C547;
+  --accent: #F6C35B;
   --accent-foreground: #1A1A1A;
   --destructive: #E74C3C;
   --destructive-foreground: #FFFFFF;
   --border: #3D3D3D;
   --input: #2D2D2D;
-  --ring: #6B9B4B;
-  --chart-1: #6B9B4B;
-  --chart-2: #E8C547;
-  --chart-3: #A08060;
-  --chart-4: #7BA05E;
-  --chart-5: #D4A84B;
+  --ring: #4DBA78;
+  --chart-1: #4DBA78;
+  --chart-2: #F6C35B;
+  --chart-3: #7AB5FF;
+  --chart-4: #EF8176;
+  --chart-5: #A08BFF;
   --sidebar: #242424;
   --sidebar-foreground: #F5F0E8;
   --sidebar-primary: #6B9B4B;
@@ -129,6 +129,8 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
   --radius-sm: calc(var(--radius) - 2px);
   --radius-md: var(--radius);
   --radius-lg: calc(var(--radius) + 2px);
@@ -146,9 +148,26 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    box-sizing: border-box;
+  }
+  html {
+    min-height: 100%;
+    background: var(--background);
   }
   body {
     @apply bg-background text-foreground;
+    min-height: 100%;
+    overflow-x: hidden;
+  }
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+  img,
+  video,
+  canvas,
+  svg {
+    max-width: 100%;
   }
 }
 
@@ -183,6 +202,22 @@
 
 .animate-slide-up {
   animation: slide-up 0.3s ease-out;
+}
+
+/* Page fade-in */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out both;
 }
 
 /* Pixel Border Style */
@@ -227,6 +262,236 @@
   scrollbar-width: none;
 }
 
+/* Responsive app surfaces */
+.plantcraft-shell {
+  position: relative;
+  isolation: isolate;
+  background:
+    linear-gradient(135deg, rgba(47, 143, 91, 0.08) 0 18%, transparent 18% 100%),
+    linear-gradient(225deg, rgba(107, 166, 255, 0.09) 0 16%, transparent 16% 100%),
+    repeating-linear-gradient(0deg, rgba(30, 47, 37, 0.025) 0 1px, transparent 1px 28px),
+    repeating-linear-gradient(90deg, rgba(30, 47, 37, 0.02) 0 1px, transparent 1px 28px),
+    var(--background);
+}
+
+.plantcraft-shell::before {
+  pointer-events: none;
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.12)),
+    repeating-linear-gradient(45deg, transparent 0 18px, rgba(246, 195, 91, 0.04) 18px 20px);
+}
+
+.app-main {
+  width: 100%;
+  min-width: 0;
+}
+
+.page-container {
+  width: min(100%, 1180px);
+  max-width: 100%;
+  min-width: 0;
+  margin-inline: auto;
+  padding: 1rem;
+}
+
+.page-stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  gap: 1rem;
+}
+
+.page-stack > * {
+  min-width: 0;
+}
+
+.page-hero {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(47, 143, 91, 0.1), rgba(255, 255, 255, 0.55) 48%, rgba(246, 195, 91, 0.09));
+  border-block: 1px solid color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.page-hero::after {
+  pointer-events: none;
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--primary), var(--accent), #6ba6ff, var(--primary));
+  opacity: 0.6;
+}
+
+.surface-panel {
+  border: 1px solid color-mix(in srgb, var(--border) 82%, white);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--card) 88%, transparent);
+  box-shadow: 0 8px 24px rgba(30, 47, 37, 0.06);
+  backdrop-filter: blur(14px);
+}
+
+.pixel-shadow {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.72) inset,
+    3px 3px 0 color-mix(in srgb, var(--primary) 18%, transparent),
+    0 10px 24px rgba(30, 47, 37, 0.08);
+}
+
+.soft-button {
+  min-height: 2.75rem;
+  box-shadow: 0 6px 16px rgba(47, 143, 91, 0.15);
+  transition: box-shadow 0.2s, transform 0.15s;
+}
+
+.soft-button:hover {
+  box-shadow: 0 8px 20px rgba(47, 143, 91, 0.22);
+  transform: translateY(-1px);
+}
+
+.soft-button:active {
+  transform: translateY(0);
+  box-shadow: 0 3px 8px rgba(47, 143, 91, 0.12);
+}
+
+.section-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--card) 80%, var(--secondary));
+  padding: 0.35rem 0.65rem;
+  color: var(--primary);
+}
+
+/* Card hover utility */
+.card-hover {
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.72) inset,
+    3px 3px 0 color-mix(in srgb, var(--primary) 18%, transparent),
+    0 14px 32px rgba(30, 47, 37, 0.12);
+}
+
+.card-hover:active {
+  transform: translateY(0);
+}
+
+/* Text balance for headings */
+.text-balance {
+  text-wrap: balance;
+}
+
+.plant-grid {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.75rem), 1fr));
+  gap: 0.85rem;
+}
+
+.scanner-frame {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.8) inset,
+    0 14px 32px rgba(30, 47, 37, 0.1);
+}
+
+.stable-bottom-nav {
+  padding-bottom: max(0.25rem, env(safe-area-inset-bottom));
+}
+
+/* Scroll snap for filter bars */
+.snap-scroll-x {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.snap-scroll-x > * {
+  scroll-snap-align: start;
+}
+
+.hud-stat-chip {
+  display: inline-flex;
+  height: 2rem;
+  min-width: 4rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-width: 1px;
+  border-radius: 6px;
+  padding-inline: 0.55rem;
+}
+
+.camera-nav-button::before {
+  pointer-events: none;
+  content: "";
+  position: absolute;
+  inset: -0.45rem;
+  border: 1px solid rgba(47, 143, 91, 0.18);
+  border-radius: inherit;
+}
+
+@media (min-width: 640px) {
+  .page-container {
+    padding: 1.25rem;
+  }
+
+  .plant-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .shop-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .app-main {
+    padding-bottom: 2rem;
+  }
+
+  .page-container {
+    padding: 1.5rem 2rem;
+  }
+
+  .plant-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .shop-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  .plant-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* Camera viewfinder */
 .ar-scanning-line {
   animation: scan-line 2s ease-in-out infinite;
@@ -235,4 +500,387 @@
 @keyframes scan-line {
   0%, 100% { top: 20%; }
   50% { top: 80%; }
+}
+
+/* Dashboard command center */
+.dashboard-command-center {
+  padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+}
+
+.dashboard-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.dashboard-empty-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.dashboard-map-column,
+.dashboard-side-panel,
+.dashboard-roster {
+  min-width: 0;
+}
+
+.dashboard-map-column {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.dashboard-side-panel {
+  display: grid;
+  align-content: start;
+  gap: 0.85rem;
+}
+
+.garden-map-shell {
+  position: relative;
+  min-height: clamp(360px, 62vh, 620px);
+  overflow: hidden;
+  border: 2px solid color-mix(in srgb, var(--primary) 55%, var(--border));
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.08)),
+    color-mix(in srgb, var(--secondary) 75%, var(--background));
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.72) inset,
+    4px 4px 0 color-mix(in srgb, var(--primary) 18%, transparent),
+    0 18px 44px rgba(30, 47, 37, 0.12);
+}
+
+.garden-map-surface {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 48% 48%, rgba(246, 195, 91, 0.16), transparent 0 16%, transparent 16%),
+    radial-gradient(circle at 20% 32%, rgba(107, 166, 255, 0.18), transparent 0 12%, transparent 13%),
+    radial-gradient(circle at 76% 68%, rgba(47, 143, 91, 0.17), transparent 0 14%, transparent 15%),
+    linear-gradient(35deg, transparent 0 31%, rgba(47, 143, 91, 0.12) 31% 35%, transparent 35% 58%, rgba(246, 195, 91, 0.13) 58% 62%, transparent 62%),
+    repeating-linear-gradient(0deg, rgba(30, 47, 37, 0.045) 0 1px, transparent 1px 34px),
+    repeating-linear-gradient(90deg, rgba(30, 47, 37, 0.04) 0 1px, transparent 1px 34px),
+    linear-gradient(135deg, #dff3e7, #eef8f1 52%, #f9edc9);
+}
+
+.garden-map-surface::before {
+  pointer-events: none;
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.26), transparent 22% 78%, rgba(255, 255, 255, 0.24)),
+    radial-gradient(circle at center, transparent 0 42%, rgba(30, 47, 37, 0.08) 100%);
+}
+
+.map-route {
+  position: absolute;
+  border: 2px dashed rgba(47, 143, 91, 0.36);
+  border-radius: 999px;
+}
+
+.map-route-a {
+  left: 5%;
+  top: 30%;
+  width: 88%;
+  height: 32%;
+  transform: rotate(-12deg);
+}
+
+.map-route-b {
+  left: 18%;
+  top: 8%;
+  width: 46%;
+  height: 84%;
+  transform: rotate(18deg);
+}
+
+.map-scan-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(70vw, 420px);
+  aspect-ratio: 1;
+  border: 2px solid rgba(47, 143, 91, 0.18);
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  box-shadow:
+    0 0 0 30px rgba(47, 143, 91, 0.05),
+    0 0 0 70px rgba(107, 166, 255, 0.045);
+  animation: map-scan-pulse 3.4s ease-in-out infinite;
+}
+
+@keyframes map-scan-pulse {
+  0%, 100% {
+    opacity: 0.78;
+    transform: translate(-50%, -50%) scale(0.96);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.03);
+  }
+}
+
+.map-status-pill,
+.map-compass {
+  position: absolute;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--primary);
+  box-shadow: 0 8px 20px rgba(30, 47, 37, 0.08);
+  backdrop-filter: blur(14px);
+}
+
+.map-status-pill {
+  left: 1rem;
+  top: 1rem;
+  gap: 0.45rem;
+  border-radius: 999px;
+  padding: 0.5rem 0.7rem;
+}
+
+.map-compass {
+  right: 1rem;
+  top: 1rem;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 8px;
+}
+
+.map-player-pin {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 4;
+  display: grid;
+  width: 4.75rem;
+  height: 4.75rem;
+  place-items: center;
+  border: 3px solid var(--card);
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow:
+    0 0 0 8px rgba(47, 143, 91, 0.18),
+    0 12px 32px rgba(30, 47, 37, 0.18);
+  transform: translate(-50%, -50%);
+}
+
+.plant-map-marker {
+  --marker-hp: 100%;
+  position: absolute;
+  z-index: 6;
+  display: grid;
+  min-width: 4.7rem;
+  justify-items: center;
+  gap: 0.35rem;
+  color: var(--foreground);
+  transform: translate(-50%, -50%);
+  transition: transform 0.18s ease, filter 0.18s ease;
+}
+
+.plant-map-marker:hover,
+.plant-map-marker.is-selected {
+  filter: drop-shadow(0 10px 16px rgba(30, 47, 37, 0.16));
+  transform: translate(-50%, -54%) scale(1.04);
+}
+
+.plant-map-marker-avatar {
+  position: relative;
+  display: grid;
+  width: 3.6rem;
+  height: 3.6rem;
+  place-items: center;
+  overflow: hidden;
+  border: 3px solid var(--card);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at center, var(--card) 0 55%, transparent 56%),
+    conic-gradient(var(--primary) var(--marker-hp), rgba(30, 47, 37, 0.12) 0);
+  color: var(--primary);
+  box-shadow:
+    0 0 0 3px rgba(47, 143, 91, 0.22),
+    0 10px 22px rgba(30, 47, 37, 0.14);
+}
+
+.plant-map-marker-avatar img {
+  width: calc(100% - 0.5rem);
+  height: calc(100% - 0.5rem);
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.plant-map-marker-orbit {
+  position: absolute;
+  top: 1.8rem;
+  width: 4.65rem;
+  aspect-ratio: 1;
+  border: 1px solid rgba(47, 143, 91, 0.18);
+  border-radius: 999px;
+  transform: translateY(-50%);
+}
+
+.plant-map-marker-name {
+  max-width: 6.5rem;
+  overflow: hidden;
+  border: 1px solid rgba(47, 143, 91, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  padding: 0.28rem 0.45rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.38rem;
+  line-height: 1.35;
+  box-shadow: 0 6px 16px rgba(30, 47, 37, 0.08);
+}
+
+.plant-map-marker-critical .plant-map-marker-avatar,
+.plant-map-marker-diagnosis .plant-map-marker-avatar {
+  box-shadow:
+    0 0 0 3px rgba(231, 76, 60, 0.24),
+    0 10px 22px rgba(231, 76, 60, 0.16);
+}
+
+.plant-map-marker-critical .plant-map-marker-name,
+.plant-map-marker-diagnosis .plant-map-marker-name {
+  border-color: rgba(231, 76, 60, 0.3);
+  color: var(--destructive);
+}
+
+.plant-map-marker-care .plant-map-marker-avatar {
+  box-shadow:
+    0 0 0 3px rgba(246, 195, 91, 0.28),
+    0 10px 22px rgba(30, 47, 37, 0.14);
+}
+
+.dashboard-action-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.selected-plant-panel,
+.dashboard-roster,
+.care-queue-panel,
+.activity-panel {
+  padding: 0.85rem;
+}
+
+.care-task-row,
+.activity-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.68);
+  padding: 0.75rem;
+}
+
+.care-task-row {
+  transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease;
+}
+
+.care-task-row:hover {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+  background: rgba(255, 255, 255, 0.86);
+  transform: translateY(-1px);
+}
+
+.care-task-row-danger {
+  border-color: rgba(231, 76, 60, 0.24);
+  background: rgba(231, 76, 60, 0.08);
+}
+
+.care-task-row-warning {
+  border-color: rgba(246, 195, 91, 0.32);
+  background: rgba(246, 195, 91, 0.12);
+}
+
+.care-task-icon {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--secondary) 78%, white);
+  color: var(--primary);
+}
+
+.activity-row {
+  padding-block: 0.7rem;
+}
+
+.activity-dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  flex: 0 0 auto;
+  border: 2px solid var(--card);
+  border-radius: 999px;
+  background: var(--primary);
+  box-shadow: 0 0 0 3px rgba(47, 143, 91, 0.16);
+}
+
+.plant-card-selector {
+  transition: transform 0.18s ease;
+}
+
+.plant-card-selector:hover {
+  transform: translateY(-1px);
+}
+
+@media (min-width: 1024px) {
+  .dashboard-command-center {
+    padding-bottom: 2rem;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+    align-items: start;
+  }
+
+  .dashboard-roster {
+    grid-column: 1 / -1;
+  }
+
+  .dashboard-side-panel {
+    position: sticky;
+    top: 8.5rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .dashboard-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  }
+
+  .garden-map-shell {
+    min-height: 620px;
+  }
+}
+
+@media (max-width: 520px) {
+  .dashboard-action-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .plant-map-marker {
+    min-width: 4rem;
+  }
+
+  .plant-map-marker-avatar {
+    width: 3.1rem;
+    height: 3.1rem;
+  }
+
+  .plant-map-marker-name {
+    max-width: 5.2rem;
+    font-size: 0.34rem;
+  }
 }

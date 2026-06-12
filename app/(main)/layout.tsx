@@ -1,5 +1,6 @@
 import { BottomNav } from '@/components/bottom-nav'
 import { AppHeader } from '@/components/app-header'
+import { FriendPlantSync } from '@/components/friend-plant-sync'
 
 export default function MainLayout({
   children,
@@ -7,12 +8,13 @@ export default function MainLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="plantcraft-shell flex min-h-screen flex-col">
       <AppHeader />
-      <main className="flex-1 pb-20">
+      <FriendPlantSync />
+      <BottomNav />
+      <main className="app-main animate-fade-in flex-1 pb-20 lg:pb-0">
         {children}
       </main>
-      <BottomNav />
     </div>
   )
 }

@@ -15,10 +15,28 @@ export interface SharedPlacedItem {
 
 export interface PublicPlantData {
   name: string
+  description: string
   hp: number
   species?: string
   placedItems: SharedPlacedItem[]
   lastUpdated: number
+}
+
+type FirebasePlacedItems = SharedPlacedItem[] | Record<string, SharedPlacedItem | null>
+
+export interface OwnedPlantData {
+  id: string
+  name: string
+  description: string
+  imageUrl: string
+  hp: number
+  lastWatered: number
+  lastWipedAt: number
+  createdAt: number
+  isPublic: boolean
+  pendingDiagnosis: Plant['pendingDiagnosis']
+  placedItems: FirebasePlacedItems
+  updatedAt: number
 }
 
 export interface QRPayload {
@@ -37,6 +55,71 @@ async function getDB() {
   }
 }
 
+function normalizePlacedItems(value: unknown): SharedPlacedItem[] {
+  if (!value) return []
+
+  const rawItems = Array.isArray(value)
+    ? value
+    : typeof value === 'object'
+      ? Object.values(value as Record<string, unknown>)
+      : []
+
+  const normalized = rawItems.flatMap((item) => {
+    if (!item || typeof item !== 'object') return []
+
+    const candidate = item as Partial<SharedPlacedItem>
+    if (
+      typeof candidate.id !== 'string' ||
+      typeof candidate.itemId !== 'string' ||
+      typeof candidate.anchorX !== 'number' ||
+      typeof candidate.anchorY !== 'number' ||
+      typeof candidate.scaleRatio !== 'number'
+    ) {
+      return []
+    }
+
+    return [{
+      id: candidate.id,
+      itemId: candidate.itemId,
+      anchorX: candidate.anchorX,
+      anchorY: candidate.anchorY,
+      scaleRatio: candidate.scaleRatio,
+    }]
+  })
+
+  return [...new Map(normalized.map((item) => [item.id, item])).values()]
+}
+
+function normalizePublicPlantData(value: unknown): PublicPlantData | null {
+  if (!value || typeof value !== 'object') return null
+
+  const data = value as Partial<Omit<PublicPlantData, 'placedItems'>> & {
+    placedItems?: unknown
+  }
+
+  return {
+    name: typeof data.name === 'string' ? data.name : 'Friend Plant',
+    description: typeof data.description === 'string' ? data.description : '',
+    hp: typeof data.hp === 'number' ? Math.max(0, Math.min(100, data.hp)) : 0,
+    species: typeof data.species === 'string' ? data.species : undefined,
+    placedItems: normalizePlacedItems(data.placedItems),
+    lastUpdated: typeof data.lastUpdated === 'number' ? data.lastUpdated : Date.now(),
+  }
+}
+
+function serializePlacedItems(plant: Plant, sharedOnly: boolean): FirebasePlacedItems {
+  return Object.fromEntries((plant.placedItems || [])
+    .filter(item => !sharedOnly || plant.isPublic || item.isShared)
+    .map(item => ({
+      id: item.id,
+      itemId: item.itemId,
+      anchorX: item.anchorX,
+      anchorY: item.anchorY,
+      scaleRatio: item.scaleRatio,
+    }))
+    .map((item) => [item.id, item]))
+}
+
 export async function publishToFirebase(
   plant: Plant,
   ownerUid: string,
@@ -48,25 +131,64 @@ export async function publishToFirebase(
 
     const { ref, set } = await import('firebase/database' as string) as typeof import('firebase/database')
 
-    // Map local PlacedItems to Firebase format
-    const sharedItems: SharedPlacedItem[] = (plant.placedItems || [])
-      .filter(item => plant.isPublic || item.isShared)
-      .map(item => ({
-        id: item.id,
-        itemId: item.itemId,
-        anchorX: item.anchorX,
-        anchorY: item.anchorY,
-        scaleRatio: item.scaleRatio,
-      }))
-
-    const data: PublicPlantData = {
+    const data = {
       name: plant.name,
+      description: plant.description ?? '',
       hp,
-      placedItems: sharedItems,
+      placedItems: serializePlacedItems(plant, true),
       lastUpdated: Date.now(),
     }
 
     await set(ref(db, `plantcraft-public/${ownerUid}/${plant.id}`), data)
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function publishOwnedPlantToFirebase(
+  plant: Plant,
+  ownerUid: string,
+  hp: number
+): Promise<boolean> {
+  try {
+    const db = await getDB()
+    if (!db) return false
+
+    const { ref, set } = await import('firebase/database' as string) as typeof import('firebase/database')
+    const now = Date.now()
+    const data: OwnedPlantData = {
+      id: plant.id,
+      name: plant.name,
+      description: plant.description ?? '',
+      imageUrl: plant.imageUrl,
+      hp,
+      lastWatered: plant.lastWatered,
+      lastWipedAt: plant.lastWipedAt,
+      createdAt: plant.createdAt,
+      isPublic: plant.isPublic,
+      pendingDiagnosis: plant.pendingDiagnosis ?? null,
+      placedItems: serializePlacedItems(plant, false),
+      updatedAt: now,
+    }
+
+    await set(ref(db, `plantcraft-plants/${ownerUid}/${plant.id}`), data)
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function removeOwnedPlantFromFirebase(
+  plantId: string,
+  ownerUid: string
+): Promise<boolean> {
+  try {
+    const db = await getDB()
+    if (!db) return false
+
+    const { ref, remove } = await import('firebase/database' as string) as typeof import('firebase/database')
+    await remove(ref(db, `plantcraft-plants/${ownerUid}/${plantId}`))
     return true
   } catch {
     return false
@@ -149,20 +271,21 @@ export async function syncHPToFirebase(
 export async function subscribeToPlant(
   ownerUid: string,
   plantId: string,
-  onData: (data: PublicPlantData | null) => void
+  onData: (data: PublicPlantData | null) => void,
+  onError?: (error: Error) => void
 ): Promise<(() => void) | null> {
   try {
     const db = await getDB()
     if (!db) return null
 
-    const { ref, onValue, off } = await import('firebase/database' as string) as typeof import('firebase/database')
+    const { ref, onValue } = await import('firebase/database' as string) as typeof import('firebase/database')
     const plantRef = ref(db, `plantcraft-public/${ownerUid}/${plantId}`)
 
-    const callback = onValue(plantRef, (snapshot) => {
-      onData(snapshot.exists() ? (snapshot.val() as PublicPlantData) : null)
+    return onValue(plantRef, (snapshot) => {
+      onData(snapshot.exists() ? normalizePublicPlantData(snapshot.val()) : null)
+    }, (error) => {
+      onError?.(error)
     })
-
-    return () => off(plantRef, 'value', callback)
   } catch {
     return null
   }
@@ -178,7 +301,7 @@ export async function fetchPlantOnce(
 
     const { ref, get } = await import('firebase/database' as string) as typeof import('firebase/database')
     const snapshot = await get(ref(db, `plantcraft-public/${ownerUid}/${plantId}`))
-    return snapshot.exists() ? (snapshot.val() as PublicPlantData) : null
+    return snapshot.exists() ? normalizePublicPlantData(snapshot.val()) : null
   } catch {
     return null
   }

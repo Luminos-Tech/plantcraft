@@ -1,7 +1,21 @@
 'use client'
 
 import { Suspense, useState, useRef, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
+import {
+  AlertTriangle,
+  Camera,
+  CheckCircle2,
+  FileImage,
+  Loader2,
+  QrCode,
+  RotateCcw,
+  ScanLine,
+  Sparkles,
+  Users,
+  X,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { subscribeToPlant, type PublicPlantData, type QRPayload } from '@/lib/firebase/plant-sync'
 import { useGameStore } from '@/lib/store'
@@ -21,6 +35,7 @@ function ScanFriendContent() {
   const streamRef = useRef<MediaStream | null>(null)
   const scanIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const unsubscribeRef = useRef<(() => void) | null>(null)
+  const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const jsQRRef = useRef<((data: Uint8ClampedArray, w: number, h: number, opts?: { inversionAttempts?: string }) => { data: string } | null) | null>(null)
 
@@ -49,6 +64,13 @@ function ScanFriendContent() {
     if (scanIntervalRef.current) {
       clearInterval(scanIntervalRef.current)
       scanIntervalRef.current = null
+    }
+  }, [])
+
+  const clearLoadingTimeout = useCallback(() => {
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current)
+      loadingTimeoutRef.current = null
     }
   }, [])
 
@@ -101,9 +123,10 @@ function ScanFriendContent() {
   useEffect(() => {
     return () => {
       stopCamera()
+      clearLoadingTimeout()
       unsubscribeRef.current?.()
     }
-  }, [stopCamera])
+  }, [clearLoadingTimeout, stopCamera])
 
   // ─── Process detected QR payload ──────────────────────────────────────────
 
@@ -120,15 +143,25 @@ function ScanFriendContent() {
     setScanState('loading')
     unsubscribeRef.current?.()
     unsubscribeRef.current = null
+    clearLoadingTimeout()
     stopCamera() // Stop camera after successful detection
 
+    loadingTimeoutRef.current = setTimeout(() => {
+      unsubscribeRef.current?.()
+      unsubscribeRef.current = null
+      setErrorMsg('Timed out loading this shared plant. Make sure Public Mode is on, Firebase Realtime Database rules allow reads, and the owner is using the newest QR.')
+      setScanState('error')
+    }, 8000)
+
     const unsub = await subscribeToPlant(payload.ownerUid, payload.plantId, (data) => {
+      clearLoadingTimeout()
       if (data) {
         setPlantData(data)
         setScanState('detected')
         // Save to Friend's Garden
         addFriendPlant(payload.ownerUid, payload.plantId, {
           name: data.name,
+          description: data.description,
           hp: data.hp,
           placedItems: data.placedItems ?? [],
           lastUpdated: data.lastUpdated,
@@ -137,18 +170,24 @@ function ScanFriendContent() {
         setErrorMsg("Plant owner hasn't enabled public sharing. Ask them to turn on Public Mode!")
         setScanState('error')
       }
+    }, (error) => {
+      clearLoadingTimeout()
+      console.error('[PlantCraft] Firebase shared plant read failed:', error)
+      setErrorMsg(`Could not read this shared plant from Firebase: ${error.message || 'check database rules and network.'}`)
+      setScanState('error')
     })
 
     if (unsub) {
       unsubscribeRef.current = unsub
     } else {
+      clearLoadingTimeout()
       // Firebase not configured — demo data
-      const demoData = { name: 'Demo Plant', hp: 75, placedItems: [] as PublicPlantData['placedItems'], lastUpdated: Date.now() }
+      const demoData = { name: 'Demo Plant', description: 'Firebase is not configured, so this is a local preview.', hp: 75, placedItems: [] as PublicPlantData['placedItems'], lastUpdated: Date.now() }
       setPlantData(demoData)
       setScanState('detected')
       addFriendPlant(payload.ownerUid, payload.plantId, demoData)
     }
-  }, [addFriendPlant, stopCamera])
+  }, [addFriendPlant, clearLoadingTimeout, stopCamera])
 
   useEffect(() => {
     const ownerUid = searchParams.get('ownerUid')
@@ -290,6 +329,7 @@ function ScanFriendContent() {
     setPlantData(null)
     setDetectedPayload(null)
     setErrorMsg(null)
+    clearLoadingTimeout()
     stopCamera()
     unsubscribeRef.current?.()
     unsubscribeRef.current = null
@@ -301,207 +341,218 @@ function ScanFriendContent() {
     return '#F44336'
   }
 
-  const getStatusIcon = (hp: number) => {
-    if (hp >= 70) return '✅'
-    if (hp >= 40) return '⚠️'
-    return '🚨'
-  }
-
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-full px-4 py-4">
-      {/* Header */}
-      <div className="mb-4">
-        <h2 className="font-pixel text-xs text-foreground">Scan Friend&apos;s Plant</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Scan a QR code to add friend&apos;s plant to your collection!
-        </p>
-      </div>
-
-      {/* Scanner Area */}
-      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-sm border-2 border-primary bg-muted">
-        <video
-          ref={scanVideoRef}
-          autoPlay
-          playsInline
-          muted
-          className={`h-full w-full object-cover ${scanState === 'scanning' ? 'block' : 'hidden'}`}
-        />
-
-        {scanState === 'scanning' ? (
-          <>
-            {/* Corner markers */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="relative h-40 w-40">
-                <div className="absolute left-0 top-0 h-6 w-6 border-l-4 border-t-4 border-accent" />
-                <div className="absolute right-0 top-0 h-6 w-6 border-r-4 border-t-4 border-accent" />
-                <div className="absolute bottom-0 left-0 h-6 w-6 border-b-4 border-l-4 border-accent" />
-                <div className="absolute bottom-0 right-0 h-6 w-6 border-b-4 border-r-4 border-accent" />
-                <div className="absolute left-2 right-2 h-0.5 bg-accent/80 ar-scanning-line" />
-              </div>
+    <div className="page-stack">
+      <section className="page-hero">
+        <div className="page-container flex items-center justify-between gap-4 py-4 sm:py-5">
+          <div className="min-w-0">
+            <span className="section-kicker font-pixel text-[8px]">
+              <QrCode className="h-3.5 w-3.5" aria-hidden="true" />
+              Friend Sync
+            </span>
+            <h2 className="text-balance mt-2.5 font-pixel text-sm text-foreground sm:text-base">Scan Friend&apos;s Plant</h2>
+            <p className="mt-1.5 max-w-xl text-sm text-muted-foreground">Shared garden scanner</p>
+          </div>
+          <div className="flex shrink-0 flex-col items-center gap-1 rounded-md border border-primary/20 bg-secondary/50 px-4 py-2.5">
+            <Users className="h-5 w-5 text-primary" aria-hidden="true" />
+            <div className="font-pixel text-xl text-primary sm:text-2xl">{friendPlants.length}</div>
+            <div className="font-pixel text-[7px] text-muted-foreground">
+              friend{friendPlants.length !== 1 ? 's' : ''}
             </div>
-            <div className="absolute bottom-3 left-0 right-0 text-center">
-              <span className="rounded-sm bg-black/60 px-3 py-1.5 font-pixel text-[8px] text-white">
-                📷 Searching for PlantCraft QR...
-              </span>
-            </div>
-          </>
-        ) : scanState === 'detected' && plantData ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 p-4 text-center bg-gradient-to-b from-primary/5 to-primary/20">
-            <div className="w-full max-w-xs rounded-sm border-2 border-primary bg-card p-3 shadow-lg">
-              <div className="mb-1 text-2xl">{getStatusIcon(plantData.hp)}</div>
-              <h3 className="font-pixel text-xs text-primary">🌿 {plantData.name}</h3>
+          </div>
+        </div>
+      </section>
 
-              <div className="mt-2">
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="font-pixel text-[7px] text-muted-foreground">HP</span>
-                  <span className="font-pixel text-[10px] font-bold" style={{ color: getHpColor(plantData.hp) }}>
-                    ♥ {plantData.hp}/100
+      <div className="page-container grid gap-5 pt-0 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+        <section className="min-w-0">
+          <div className="scanner-frame relative aspect-[4/3] w-full overflow-hidden rounded-lg border-2 border-primary bg-muted lg:aspect-[16/11]">
+            <video
+              ref={scanVideoRef}
+              autoPlay
+              playsInline
+              muted
+              className={`h-full w-full object-cover ${scanState === 'scanning' ? 'block' : 'hidden'}`}
+            />
+
+            {scanState === 'scanning' ? (
+              <>
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0_34%,rgba(0,0,0,0.28)_64%)]" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="relative h-40 w-40 sm:h-52 sm:w-52">
+                    <div className="absolute left-0 top-0 h-8 w-8 border-l-3 border-t-3 border-accent" />
+                    <div className="absolute right-0 top-0 h-8 w-8 border-r-3 border-t-3 border-accent" />
+                    <div className="absolute bottom-0 left-0 h-8 w-8 border-b-3 border-l-3 border-accent" />
+                    <div className="absolute bottom-0 right-0 h-8 w-8 border-b-3 border-r-3 border-accent" />
+                    <div className="absolute left-3 right-3 h-0.5 bg-accent/90 shadow-[0_0_16px_rgba(246,195,91,0.8)] ar-scanning-line" />
+                  </div>
+                </div>
+                <div className="absolute bottom-4 left-0 right-0 text-center">
+                  <span className="inline-flex items-center gap-2 rounded-md bg-black/65 px-3 py-2 font-pixel text-[8px] text-white shadow-lg backdrop-blur-sm">
+                    <ScanLine className="h-3.5 w-3.5" aria-hidden="true" />
+                    Searching for PlantCraft QR...
                   </span>
                 </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full transition-all duration-700"
-                    style={{ width: `${plantData.hp}%`, background: getHpColor(plantData.hp) }}
-                  />
+              </>
+            ) : scanState === 'detected' && plantData ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3 bg-gradient-to-b from-primary/5 to-primary/15 p-4 text-center">
+                <div className="w-full max-w-xs rounded-lg border-2 border-primary bg-card/95 p-4 shadow-lg">
+                  <CheckCircle2 className="mx-auto mb-2 h-9 w-9 text-primary" aria-hidden="true" />
+                  <h3 className="break-words font-pixel text-xs text-primary">{plantData.name}</h3>
+                  {plantData.description && (
+                    <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-muted-foreground">
+                      {plantData.description}
+                    </p>
+                  )}
+
+                  <div className="mt-3">
+                    <div className="mb-1 flex items-center justify-between">
+                      <span className="font-pixel text-[7px] text-muted-foreground">HP</span>
+                      <span className="font-pixel text-[10px] font-bold" style={{ color: getHpColor(plantData.hp) }}>
+                        {plantData.hp}/100
+                      </span>
+                    </div>
+                    <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted ring-1 ring-border/70">
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{ width: `${plantData.hp}%`, background: getHpColor(plantData.hp) }}
+                      />
+                    </div>
+                  </div>
+
+                  <p className="mt-3 font-pixel text-[8px] text-primary">Added to Friend&apos;s Garden</p>
                 </div>
               </div>
+            ) : scanState === 'loading' ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+                <Loader2 className="h-10 w-10 animate-spin text-primary" aria-hidden="true" />
+                <p className="font-pixel text-[10px] text-muted-foreground">Loading shared plant...</p>
+              </div>
+            ) : scanState === 'error' ? (
+              <div className="flex h-full flex-col items-center justify-center p-6 text-center">
+                <AlertTriangle className="h-10 w-10 text-destructive" aria-hidden="true" />
+                <p className="mt-3 max-w-xs font-pixel text-[10px] leading-relaxed text-foreground">
+                  {errorMsg || 'An error occurred'}
+                </p>
+              </div>
+            ) : isProcessingUpload ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+                <Loader2 className="h-10 w-10 animate-spin text-primary" aria-hidden="true" />
+                <p className="font-pixel text-[10px] text-muted-foreground">Reading QR code...</p>
+              </div>
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+                <div className="rounded-full bg-secondary p-4 ring-1 ring-border">
+                  <QrCode className="h-10 w-10 text-primary" aria-hidden="true" />
+                </div>
+                <p className="font-pixel text-[10px] leading-relaxed text-muted-foreground">
+                  Camera scan or QR image upload
+                </p>
+              </div>
+            )}
+          </div>
 
-              <p className="mt-2 font-pixel text-[8px] text-primary">✅ Added to Friend&apos;s Garden!</p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleUploadQR}
+          />
+
+          <div className="mt-3 space-y-2">
+            {(scanState === 'idle' || isProcessingUpload) && (
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  onClick={startCamera}
+                  disabled={isProcessingUpload}
+                  className="soft-button min-h-11 rounded-md bg-primary font-pixel text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                >
+                  <Camera className="h-4 w-4" aria-hidden="true" />
+                  Camera
+                </Button>
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isProcessingUpload}
+                  variant="outline"
+                  className="soft-button min-h-11 rounded-md border-2 border-primary bg-card/85 font-pixel text-xs disabled:opacity-50"
+                >
+                  {isProcessingUpload ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <FileImage className="h-4 w-4" aria-hidden="true" />}
+                  Upload QR
+                </Button>
+              </div>
+            )}
+
+            {scanState === 'scanning' && (
+              <Button
+                variant="outline"
+                onClick={() => { stopCamera(); setScanState('idle') }}
+                className="soft-button min-h-11 w-full rounded-md border-2 border-primary bg-card/85 font-pixel text-xs"
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+                Cancel
+              </Button>
+            )}
+
+            {scanState === 'detected' && plantData && detectedPayload && (
+              <div className="grid grid-cols-2 gap-2">
+                <Link
+                  href={`/camera?friendOwner=${detectedPayload.ownerUid}&friendPlant=${detectedPayload.plantId}`}
+                  className="soft-button flex min-h-11 items-center justify-center gap-2 rounded-md bg-accent px-3 py-2 font-pixel text-xs text-accent-foreground transition-colors hover:bg-accent/90"
+                >
+                  <Sparkles className="h-4 w-4" aria-hidden="true" />
+                  View AR
+                </Link>
+                <Button
+                  onClick={resetScan}
+                  variant="outline"
+                  className="soft-button min-h-11 rounded-md border-2 border-primary bg-card/85 font-pixel text-xs"
+                >
+                  <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                  Scan another
+                </Button>
+              </div>
+            )}
+
+            {scanState === 'error' && (
+              <Button
+                onClick={resetScan}
+                className="soft-button min-h-11 w-full rounded-md bg-primary font-pixel text-xs text-primary-foreground hover:bg-primary/90"
+              >
+                <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                Try again
+              </Button>
+            )}
+          </div>
+        </section>
+
+        <section className="min-w-0">
+          <div className="mb-3 flex items-center justify-between gap-3 rounded-md bg-secondary/40 px-3 py-2">
+            <h2 className="flex items-center gap-2 font-pixel text-xs text-foreground">
+              <Users className="h-4 w-4 text-primary" aria-hidden="true" />
+              Friend&apos;s Garden
+            </h2>
+            <span className="font-pixel text-[8px] text-muted-foreground">
+              {friendPlants.length} plant{friendPlants.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+
+          {friendPlants.length === 0 ? (
+            <div className="surface-panel flex min-h-48 flex-col items-center justify-center px-4 py-8 text-center">
+              <Users className="h-9 w-9 text-muted-foreground" aria-hidden="true" />
+              <p className="mt-3 font-pixel text-[10px] text-muted-foreground">
+                No friend plants yet
+              </p>
             </div>
-          </div>
-        ) : scanState === 'loading' ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-            <span className="text-4xl animate-spin">⚙️</span>
-            <p className="font-pixel text-[10px] text-muted-foreground">Loading shared plant...</p>
-          </div>
-        ) : scanState === 'error' ? (
-          <div className="flex h-full flex-col items-center justify-center p-6 text-center">
-            <span className="text-4xl">❌</span>
-            <p className="mt-3 font-pixel text-[10px] text-foreground">{errorMsg || 'An error occurred'}</p>
-          </div>
-        ) : isProcessingUpload ? (
-          <div className="flex h-full flex-col items-center justify-center text-center gap-2">
-            <span className="text-4xl animate-spin">⚙️</span>
-            <p className="font-pixel text-[10px] text-muted-foreground">Reading QR code...</p>
-          </div>
-        ) : (
-          <div className="flex h-full flex-col items-center justify-center text-center gap-2">
-            <span className="text-4xl">📸</span>
-            <p className="font-pixel text-[10px] text-muted-foreground">
-              Scan via camera or upload a QR image
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={handleUploadQR}
-      />
-
-      {/* Action Buttons */}
-      <div className="mt-3 space-y-2">
-        {(scanState === 'idle' || isProcessingUpload) && (
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              onClick={startCamera}
-              disabled={isProcessingUpload}
-              className="rounded-sm bg-primary font-pixel text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            >
-              📷 Camera
-            </Button>
-            <Button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isProcessingUpload}
-              variant="outline"
-              className="rounded-sm border-2 border-primary font-pixel text-xs disabled:opacity-50"
-            >
-              {isProcessingUpload ? '⏳ Reading...' : '📁 Upload QR'}
-            </Button>
-          </div>
-        )}
-
-        {scanState === 'scanning' && (
-          <Button
-            variant="outline"
-            onClick={() => { stopCamera(); setScanState('idle') }}
-            className="w-full rounded-sm border-2 border-primary font-pixel text-xs"
-          >
-            ✕ Cancel
-          </Button>
-        )}
-
-        {scanState === 'detected' && plantData && detectedPayload && (
-          <div className="grid grid-cols-2 gap-2">
-            <a
-              href={`/camera?friendOwner=${detectedPayload.ownerUid}&friendPlant=${detectedPayload.plantId}`}
-              className="flex items-center justify-center rounded-sm bg-accent px-3 py-2 font-pixel text-xs text-accent-foreground transition-colors hover:bg-accent/90"
-            >
-              🔮 View in AR
-            </a>
-            <Button
-              onClick={resetScan}
-              variant="outline"
-              className="rounded-sm border-2 border-primary font-pixel text-xs"
-            >
-              🔄 Scan another
-            </Button>
-          </div>
-        )}
-
-        {scanState === 'error' && (
-          <Button
-            onClick={resetScan}
-            className="w-full rounded-sm bg-primary font-pixel text-xs text-primary-foreground hover:bg-primary/90"
-          >
-            🔄 Try again
-          </Button>
-        )}
-      </div>
-
-      {/* ─── Friend's Garden ──────────────────────────────────────────────────── */}
-      <div className="mt-6">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-pixel text-xs text-foreground">Friend&apos;s Garden</h2>
-          <span className="font-pixel text-[8px] text-muted-foreground">
-            {friendPlants.length} plant{friendPlants.length !== 1 ? 's' : ''}
-          </span>
-        </div>
-
-        {friendPlants.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-sm border-2 border-dashed border-border px-4 py-8 text-center">
-            <span className="text-3xl">👋</span>
-            <p className="mt-2 font-pixel text-[10px] text-muted-foreground">
-              No friend plants yet
-            </p>
-            <p className="mt-1 text-[10px] text-muted-foreground">
-              Scan a PlantCraft QR code to add plants here
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {friendPlants.map((friend) => (
-              <FriendPlantCard key={friend.id} friend={friend} />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Instructions */}
-      <div className="mt-6 rounded-sm border border-border bg-secondary/50 p-4">
-        <h3 className="font-pixel text-[10px] text-foreground">How to use:</h3>
-        <ul className="mt-2 space-y-1.5 text-xs text-muted-foreground">
-          <li className="flex gap-2"><span className="text-accent">1.</span> Ask friend to open their plant&apos;s QR page</li>
-          <li className="flex gap-2"><span className="text-accent">2.</span> Scan QR, upload QR image, or open their share link</li>
-          <li className="flex gap-2"><span className="text-accent">3.</span> Plant is saved to your Friend&apos;s Garden</li>
-          <li className="flex gap-2"><span className="text-accent">4.</span> Tap <span className="font-pixel text-[8px] text-accent">🔮 View in AR</span> to see their decorations live!</li>
-        </ul>
+          ) : (
+            <div className="grid gap-3">
+              {friendPlants.map((friend) => (
+                <FriendPlantCard key={friend.id} friend={friend} />
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     </div>
   )

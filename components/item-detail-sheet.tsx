@@ -1,5 +1,6 @@
 'use client'
 
+import { CheckCircle2, Coins, LockKeyhole, ShoppingBag } from 'lucide-react'
 import { ShopItem, useGameStore } from '@/lib/store'
 import { Button } from '@/components/ui/button'
 import {
@@ -30,7 +31,7 @@ const RotatingPreview = ({ item }: { item: ShopItem }) => {
   }
 
   return (
-    <div className="flex h-32 w-32 items-center justify-center animate-spin" style={{ animationDuration: '8s' }}>
+    <div className="flex h-32 w-32 items-center justify-center animate-spin sm:h-36 sm:w-36" style={{ animationDuration: '8s' }}>
       <svg width="96" height="96" viewBox="0 0 32 32" fill="none">
         {item.category === 'hat' && (
           <>
@@ -85,14 +86,12 @@ export function ItemDetailSheet({ item, open, onOpenChange }: ItemDetailSheetPro
   const canAfford = coins >= item.price
 
   const handlePurchase = () => {
-    if (purchaseItem(item.id, item.price)) {
-      // Success feedback could be added here
-    }
+    purchaseItem(item.id, item.price)
   }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-auto max-h-[80vh] rounded-t-lg border-t-2 border-primary bg-card">
+      <SheetContent side="bottom" className="h-auto max-h-[85vh] overflow-y-auto rounded-t-lg border-t-2 border-primary bg-card/98 shadow-2xl scrollbar-hide sm:max-h-[75vh]">
         <SheetHeader className="text-center">
           <SheetTitle className="font-pixel text-sm text-primary">
             {item.name}
@@ -102,43 +101,41 @@ export function ItemDetailSheet({ item, open, onOpenChange }: ItemDetailSheetPro
           </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-6 flex flex-col items-center">
-          {/* Rotating Preview */}
-          <div className="rounded-sm border-2 border-border bg-muted p-4">
+        <div className="mx-auto mt-5 flex w-full max-w-md flex-col items-center">
+          <div className="scanner-frame rounded-lg border-2 border-border bg-[linear-gradient(135deg,var(--secondary),#ffffff)] p-4">
             <RotatingPreview item={item} />
           </div>
 
-          {/* Description */}
           <p className="mt-4 text-center text-sm text-muted-foreground leading-relaxed">
             {item.description}
           </p>
 
-          {/* Price & Balance */}
-          <div className="mt-4 flex items-center gap-4 text-center">
-            <div>
+          <div className="mt-4 grid w-full grid-cols-[1fr_auto_1fr] items-center gap-4 rounded-lg border border-border bg-secondary/50 p-3 text-center">
+            <div className="min-w-0">
               <span className="font-pixel text-[8px] text-muted-foreground">Price</span>
-              <div className="font-pixel text-sm text-accent">
-                💰 {item.price} GC
+              <div className="mt-1 flex items-center justify-center gap-1 font-pixel text-sm text-accent">
+                <Coins className="h-4 w-4" aria-hidden="true" />
+                {item.price} GC
               </div>
             </div>
             <div className="h-8 w-px bg-border" />
-            <div>
+            <div className="min-w-0">
               <span className="font-pixel text-[8px] text-muted-foreground">Balance</span>
               <div className={cn(
-                'font-pixel text-sm',
+                'mt-1 flex items-center justify-center gap-1 font-pixel text-sm',
                 canAfford ? 'text-primary' : 'text-destructive'
               )}>
-                💰 {coins} GC
+                <Coins className="h-4 w-4" aria-hidden="true" />
+                {coins} GC
               </div>
             </div>
           </div>
 
-          {/* Action Button */}
           <Button
             onClick={handlePurchase}
             disabled={isOwned || !canAfford}
             className={cn(
-              'mt-6 w-full rounded-sm font-pixel text-xs',
+              'soft-button mt-5 w-full rounded-md font-pixel text-xs',
               isOwned
                 ? 'bg-primary text-primary-foreground'
                 : canAfford
@@ -146,14 +143,24 @@ export function ItemDetailSheet({ item, open, onOpenChange }: ItemDetailSheetPro
                 : 'bg-muted text-muted-foreground'
             )}
           >
-            {isOwned
-              ? '✅ Already Owned'
-              : canAfford
-              ? '💰 Buy Now'
-              : '🔒 Not Enough Coins'}
+            {isOwned ? (
+              <>
+                <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                Already Owned
+              </>
+            ) : canAfford ? (
+              <>
+                <ShoppingBag className="h-4 w-4" aria-hidden="true" />
+                Buy Now
+              </>
+            ) : (
+              <>
+                <LockKeyhole className="h-4 w-4" aria-hidden="true" />
+                Not Enough Coins
+              </>
+            )}
           </Button>
 
-          {/* Not enough coins message */}
           {!isOwned && !canAfford && (
             <p className="mt-2 text-center font-pixel text-[8px] text-muted-foreground">
               Need {item.price - coins} more coins

@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { Camera, ImagePlus, Plus, Upload } from 'lucide-react'
 import { useGameStore } from '@/lib/store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
   DialogContent,
@@ -12,25 +14,6 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 
-function CameraIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-      <circle cx="12" cy="13" r="4" />
-    </svg>
-  )
-}
-
-function UploadIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <polyline points="17,8 12,3 7,8" />
-      <line x1="12" y1="3" x2="12" y2="15" />
-    </svg>
-  )
-}
-
 interface AddPlantModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -38,6 +21,7 @@ interface AddPlantModalProps {
 
 export function AddPlantModal({ open, onOpenChange }: AddPlantModalProps) {
   const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
   const [imageUrl, setImageUrl] = useState('')
   const [isCapturing, setIsCapturing] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
@@ -113,6 +97,15 @@ export function AddPlantModal({ open, onOpenChange }: AddPlantModalProps) {
     }
   }, [isCapturing])
 
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop())
+        streamRef.current = null
+      }
+    }
+  }, [])
+
   const capturePhoto = useCallback(() => {
     if (!videoRef.current) return
 
@@ -136,8 +129,9 @@ export function AddPlantModal({ open, onOpenChange }: AddPlantModalProps) {
 
   const handleSubmit = () => {
     if (!name.trim()) return
-    addPlant(name.trim(), imageUrl)
+    addPlant(name.trim(), imageUrl, description.trim())
     setName('')
+    setDescription('')
     setImageUrl('')
     onOpenChange(false)
   }
@@ -145,19 +139,20 @@ export function AddPlantModal({ open, onOpenChange }: AddPlantModalProps) {
   const handleClose = () => {
     stopCamera()
     setName('')
+    setDescription('')
     setImageUrl('')
     onOpenChange(false)
   }
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-sm rounded-sm border-2 border-primary bg-card max-h-[90vh] overflow-y-auto scrollbar-hide">
+      <DialogContent className="max-h-[90vh] max-w-sm overflow-y-auto rounded-lg border-2 border-primary bg-card/98 shadow-2xl scrollbar-hide sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-pixel text-sm text-primary">
             Add New Plant
           </DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
-            Give your plant a name and take a photo!
+            Give your plant a name, note, and photo.
           </DialogDescription>
         </DialogHeader>
 
@@ -172,10 +167,27 @@ export function AddPlantModal({ open, onOpenChange }: AddPlantModalProps) {
               onChange={(e) => setName(e.target.value.slice(0, 20))}
               placeholder="My lovely plant..."
               maxLength={20}
-              className="mt-1 rounded-sm border-2 border-border font-sans"
+              className="mt-1 rounded-md border-2 border-border bg-input font-sans"
             />
             <span className="mt-1 block text-right font-pixel text-[8px] text-muted-foreground">
               {name.length}/20
+            </span>
+          </div>
+
+          {/* Description Input */}
+          <div>
+            <label className="font-pixel text-[10px] text-muted-foreground">
+              Description
+            </label>
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value.slice(0, 160))}
+              placeholder="Where it lives, what it needs, or a cute note..."
+              maxLength={160}
+              className="mt-1 min-h-20 resize-none rounded-md border-2 border-border bg-input text-sm"
+            />
+            <span className="mt-1 block text-right font-pixel text-[8px] text-muted-foreground">
+              {description.length}/160
             </span>
           </div>
 
@@ -191,7 +203,7 @@ export function AddPlantModal({ open, onOpenChange }: AddPlantModalProps) {
               onChange={handleFileUpload}
               className="hidden"
             />
-            <div className="relative mt-1 aspect-square w-full overflow-hidden rounded-sm border-2 border-border bg-muted">
+            <div className="relative mt-1 aspect-square w-full overflow-hidden rounded-lg border-2 border-border bg-muted scanner-frame">
               <video
                 ref={videoRef}
                 autoPlay
@@ -203,8 +215,9 @@ export function AddPlantModal({ open, onOpenChange }: AddPlantModalProps) {
                 <>
                   <Button
                     onClick={capturePhoto}
-                    className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-sm bg-primary font-pixel text-[10px] text-primary-foreground"
+                    className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-md bg-primary font-pixel text-[10px] text-primary-foreground shadow-lg"
                   >
+                    <Camera className="h-4 w-4" aria-hidden="true" />
                     Capture
                   </Button>
                 </>
@@ -220,16 +233,18 @@ export function AddPlantModal({ open, onOpenChange }: AddPlantModalProps) {
                       variant="outline"
                       size="sm"
                       onClick={startCamera}
-                      className="rounded-sm border-primary font-pixel text-[8px]"
+                      className="rounded-md border-primary bg-card/90 font-pixel text-[8px]"
                     >
+                      <Camera className="h-3.5 w-3.5" aria-hidden="true" />
                       Camera
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => fileInputRef.current?.click()}
-                      className="rounded-sm border-primary font-pixel text-[8px]"
+                      className="rounded-md border-primary bg-card/90 font-pixel text-[8px]"
                     >
+                      <Upload className="h-3.5 w-3.5" aria-hidden="true" />
                       Upload
                     </Button>
                   </div>
@@ -241,19 +256,19 @@ export function AddPlantModal({ open, onOpenChange }: AddPlantModalProps) {
                       {cameraError}
                     </p>
                   )}
-                  <div className="flex gap-2">
+                  <div className="flex gap-3">
                     <button
                       onClick={startCamera}
-                      className="flex flex-col items-center gap-1 rounded-sm border-2 border-border p-3 text-muted-foreground hover:border-primary hover:text-foreground"
+                      className="flex min-h-[100px] min-w-[100px] flex-col items-center justify-center gap-2 rounded-lg border-2 border-border bg-card/85 p-3 text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
                     >
-                      <CameraIcon className="h-8 w-8" />
+                      <Camera className="h-8 w-8" aria-hidden="true" />
                       <span className="font-pixel text-[8px]">Camera</span>
                     </button>
                     <button
                       onClick={() => fileInputRef.current?.click()}
-                      className="flex flex-col items-center gap-1 rounded-sm border-2 border-border p-3 text-muted-foreground hover:border-primary hover:text-foreground"
+                      className="flex min-h-[100px] min-w-[100px] flex-col items-center justify-center gap-2 rounded-lg border-2 border-border bg-card/85 p-3 text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
                     >
-                      <UploadIcon className="h-8 w-8" />
+                      <ImagePlus className="h-8 w-8" aria-hidden="true" />
                       <span className="font-pixel text-[8px]">Upload</span>
                     </button>
                   </div>
@@ -266,9 +281,10 @@ export function AddPlantModal({ open, onOpenChange }: AddPlantModalProps) {
           <Button
             onClick={handleSubmit}
             disabled={!name.trim()}
-            className="w-full rounded-sm bg-primary font-pixel text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            className="soft-button w-full rounded-md bg-primary font-pixel text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
-            🌱 Add Plant
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Add Plant
           </Button>
         </div>
       </DialogContent>

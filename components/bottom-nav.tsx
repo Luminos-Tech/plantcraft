@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { Camera, ClipboardList, Leaf, QrCode, Store } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { APP_VERSION } from '@/lib/version'
 
@@ -11,84 +12,41 @@ interface NavItem {
   icon: React.ReactNode
 }
 
-// Pixel art style icons as simple SVGs
-const GardenIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor" className="pixel-icon">
-    <rect x="7" y="0" width="2" height="4" />
-    <rect x="5" y="2" width="2" height="2" />
-    <rect x="9" y="2" width="2" height="2" />
-    <rect x="3" y="4" width="2" height="2" />
-    <rect x="11" y="4" width="2" height="2" />
-    <rect x="7" y="4" width="2" height="4" />
-    <rect x="5" y="8" width="6" height="2" />
-    <rect x="4" y="10" width="8" height="2" />
-    <rect x="3" y="12" width="10" height="4" />
-  </svg>
-)
-
-const ShopIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor" className="pixel-icon">
-    <rect x="2" y="0" width="12" height="2" />
-    <rect x="1" y="2" width="2" height="4" />
-    <rect x="13" y="2" width="2" height="4" />
-    <rect x="3" y="2" width="10" height="2" />
-    <rect x="2" y="6" width="12" height="2" />
-    <rect x="2" y="8" width="12" height="8" />
-    <rect x="6" y="10" width="4" height="4" fill="var(--background)" />
-  </svg>
-)
-
-const CameraIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor" className="pixel-icon">
-    <rect x="5" y="0" width="6" height="2" />
-    <rect x="1" y="2" width="14" height="2" />
-    <rect x="0" y="4" width="16" height="10" />
-    <rect x="5" y="6" width="6" height="6" fill="var(--background)" />
-    <rect x="6" y="7" width="4" height="4" fill="currentColor" />
-    <rect x="12" y="5" width="2" height="2" fill="var(--accent)" />
-  </svg>
-)
-
-const ScanIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor" className="pixel-icon">
-    <rect x="0" y="0" width="4" height="2" />
-    <rect x="0" y="0" width="2" height="4" />
-    <rect x="12" y="0" width="4" height="2" />
-    <rect x="14" y="0" width="2" height="4" />
-    <rect x="0" y="14" width="4" height="2" />
-    <rect x="0" y="12" width="2" height="4" />
-    <rect x="12" y="14" width="4" height="2" />
-    <rect x="14" y="12" width="2" height="4" />
-    <rect x="4" y="7" width="8" height="2" />
-  </svg>
-)
-
 const navItems: NavItem[] = [
-  { href: '/dashboard', label: 'Garden', icon: <GardenIcon /> },
-  { href: '/shop', label: 'Shop', icon: <ShopIcon /> },
-  { href: '/camera', label: 'Camera', icon: <CameraIcon /> },
-  { href: '/scan-friend', label: 'Scan', icon: <ScanIcon /> },
+  { href: '/dashboard', label: 'Garden', icon: <Leaf className="h-5 w-5" /> },
+  { href: '/shop', label: 'Shop', icon: <Store className="h-5 w-5" /> },
+  { href: '/camera', label: 'Camera', icon: <Camera className="h-5 w-5" /> },
+  { href: '/mission', label: 'Mission', icon: <ClipboardList className="h-5 w-5" /> },
+  { href: '/scan-friend', label: 'Scan', icon: <QrCode className="h-5 w-5" /> },
 ]
 
 export function BottomNav() {
   const pathname = usePathname()
+  const cameraItem = navItems.find((item) => item.href === '/camera')!
+  const sideItems = navItems.filter((item) => item.href !== '/camera')
+  const isCameraActive = pathname.startsWith('/camera')
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t-2 border-primary bg-card">
-      <div className="flex h-16 items-center justify-around">
-        {navItems.map((item) => {
+    <nav className="stable-bottom-nav fixed bottom-0 left-0 right-0 z-50 border-t border-primary/20 bg-card/92 shadow-[0_-10px_30px_rgba(30,47,37,0.12)] backdrop-blur-xl lg:sticky lg:bottom-auto lg:top-[57px] lg:border-b lg:border-t-0 lg:shadow-sm">
+      <div className="mx-auto grid h-[4.6rem] max-w-[1180px] grid-cols-[1fr_1fr_5rem_1fr_1fr] items-center gap-1 px-2 lg:flex lg:h-14 lg:justify-center lg:gap-3">
+        {sideItems.slice(0, 2).map((item) => {
           const isActive = pathname === item.href
           return (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
-                'flex flex-col items-center gap-1 px-4 py-2 transition-colors',
+                'group relative flex min-w-0 flex-col items-center gap-1 rounded-md px-2 py-2 transition-all lg:min-w-28 lg:flex-row lg:justify-center lg:gap-2 lg:px-4',
                 isActive
                   ? 'text-primary'
-                  : 'text-muted-foreground hover:text-foreground'
+                  : 'text-muted-foreground hover:bg-secondary/80 hover:text-foreground'
               )}
+              aria-current={isActive ? 'page' : undefined}
             >
+              {/* Active top indicator */}
+              {isActive && (
+                <span className="absolute left-1/2 top-0 h-[2px] w-8 -translate-x-1/2 rounded-full bg-primary lg:hidden" />
+              )}
               <span className={cn(
                 'transition-transform',
                 isActive && 'scale-110'
@@ -96,8 +54,55 @@ export function BottomNav() {
                 {item.icon}
               </span>
               <span className={cn(
-                'font-pixel text-[8px]',
-                isActive && 'text-primary'
+                'truncate font-pixel text-[9px]',
+                isActive ? 'text-primary' : 'text-muted-foreground'
+              )}>
+                {item.label}
+              </span>
+            </Link>
+          )
+        })}
+
+        <Link
+          href={cameraItem.href}
+          className={cn(
+            'camera-nav-button group relative mx-auto -mt-8 flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-full border-[3px] border-card bg-primary text-primary-foreground shadow-[0_12px_28px_rgba(47,143,91,0.3)] transition-all hover:bg-primary/90 lg:mt-0 lg:h-10 lg:w-auto lg:min-w-32 lg:flex-row lg:rounded-md lg:border lg:border-primary lg:px-4 lg:shadow-none',
+            isCameraActive && 'bg-accent text-accent-foreground shadow-[0_12px_28px_rgba(246,195,91,0.32)] lg:border-accent'
+          )}
+          aria-current={isCameraActive ? 'page' : undefined}
+        >
+          <span className={cn('transition-transform', isCameraActive && 'scale-110')}>
+            {cameraItem.icon}
+          </span>
+          <span className="font-pixel text-[7px] lg:text-[9px]">{cameraItem.label}</span>
+        </Link>
+
+        {sideItems.slice(2).map((item) => {
+          const isActive = pathname === item.href
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                'group relative flex min-w-0 flex-col items-center gap-1 rounded-md px-1.5 py-2 transition-all lg:min-w-28 lg:flex-row lg:justify-center lg:gap-2 lg:px-4',
+                isActive
+                  ? 'text-primary'
+                  : 'text-muted-foreground hover:bg-secondary/80 hover:text-foreground'
+              )}
+              aria-current={isActive ? 'page' : undefined}
+            >
+              {isActive && (
+                <span className="absolute left-1/2 top-0 h-[2px] w-8 -translate-x-1/2 rounded-full bg-primary lg:hidden" />
+              )}
+              <span className={cn(
+                'transition-transform',
+                isActive && 'scale-110'
+              )}>
+                {item.icon}
+              </span>
+              <span className={cn(
+                'truncate font-pixel text-[9px]',
+                isActive ? 'text-primary' : 'text-muted-foreground'
               )}>
                 {item.label}
               </span>
@@ -105,7 +110,7 @@ export function BottomNav() {
           )
         })}
       </div>
-      <div className="pb-1 text-center font-pixel text-[6px] text-muted-foreground/50">
+      <div className="hidden pb-1 text-center font-pixel text-[6px] text-muted-foreground/60 lg:block">
         v{APP_VERSION}
       </div>
     </nav>

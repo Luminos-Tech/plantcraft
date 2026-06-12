@@ -7,8 +7,10 @@ import {
   ArrowRight,
   ArrowUp,
   Crosshair,
+  EyeOff,
   ImageUp,
   Lock,
+  PanelBottomOpen,
   ScanLine,
   Sparkles,
   Trash2,
@@ -58,6 +60,7 @@ export function ARToolbar({
 }: ARToolbarProps) {
   const [isScanning, setIsScanning] = useState(false)
   const [scanError, setScanError] = useState<string | null>(null)
+  const [isPanelOpen, setIsPanelOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { ownedItems, plants, setPendingDiagnosis } = useGameStore()
 
@@ -67,6 +70,7 @@ export function ARToolbar({
   )
 
   const handleScan = async () => {
+    setIsPanelOpen(true)
     setIsScanning(true)
     setScanError(null)
 
@@ -129,11 +133,13 @@ export function ARToolbar({
   }
 
   const handleItemSelect = (item: ShopItem) => {
+    setIsPanelOpen(true)
     if (deleteMode) onDeleteModeChange(false)
     onItemSelected(selectedItemId === item.id ? null : item.id)
   }
 
   const toggleDeleteMode = () => {
+    setIsPanelOpen(true)
     const next = !deleteMode
     onDeleteModeChange(next)
     if (next) onItemSelected(null)
@@ -141,9 +147,12 @@ export function ARToolbar({
 
   const selectedItem = selectedItemId ? SHOP_ITEMS.find((item) => item.id === selectedItemId) : null
   const selectedLabel = selectedItem?.name.replace(/\s+/g, ' ').slice(0, 10)
+  const readyLabel = arState.locked ? 'LOCK' : arState.detected ? 'READY' : 'FIND'
+  const readyActive = arState.locked || arState.detected
+  const canUseAnchor = arState.locked || arState.detected
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-[9999] border-t border-white/10 bg-black/50 px-3 pb-3 pt-2 backdrop-blur-md">
+    <div className="fixed bottom-0 left-0 right-0 z-[9999] px-3 pb-3">
       <input
         ref={fileInputRef}
         type="file"
@@ -152,15 +161,38 @@ export function ARToolbar({
         onChange={handleFileSelect}
       />
 
+      {!isPanelOpen && (
+        <div className="mx-auto flex w-full max-w-md items-center gap-2 rounded-md border border-white/15 bg-black/50 p-2 shadow-xl backdrop-blur-md">
+          <StatusPill active={readyActive} label={readyLabel} />
+          {selectedLabel && <StatusPill active label={selectedLabel} tone="accent" />}
+          <Button
+            onClick={() => setIsPanelOpen(true)}
+            className="ml-auto h-10 rounded-md bg-primary px-4 font-pixel text-[8px] text-primary-foreground hover:bg-primary/90"
+            title="Open AR controls"
+          >
+            <PanelBottomOpen className="h-4 w-4" />
+            Tools
+          </Button>
+        </div>
+      )}
+
+      {isPanelOpen && (
+        <div className="mx-auto w-full max-w-2xl rounded-lg border border-white/10 bg-black/58 px-3 pb-3 pt-2 shadow-2xl backdrop-blur-md">
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <StatusPill active={arState.locked} label={arState.locked ? 'LOCK' : arState.detected ? 'VISION' : 'MANUAL'} />
+          <StatusPill active={readyActive} label={readyLabel} />
           {selectedLabel && (
             <StatusPill active label={selectedLabel} tone="accent" />
           )}
         </div>
 
         <div className="flex items-center gap-1">
+          <IconButton
+            label="Hide AR controls"
+            onClick={() => setIsPanelOpen(false)}
+          >
+            <EyeOff className="h-4 w-4" />
+          </IconButton>
           <IconButton
             label="Reset plant frame"
             onClick={onResetAnchor}
@@ -170,6 +202,7 @@ export function ARToolbar({
           <IconButton
             label={arState.locked ? 'Unlock plant frame' : 'Lock plant frame'}
             active={arState.locked}
+            disabled={!arState.locked && !arState.detected}
             onClick={arState.locked ? onUnlockAnchor : onLockAnchor}
           >
             {arState.locked ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
@@ -180,17 +213,17 @@ export function ARToolbar({
       <div className="mb-2 grid grid-cols-[auto_1fr_auto] items-center gap-2">
         <div className="grid grid-cols-3 gap-1">
           <span />
-          <IconButton label="Move frame up" onClick={() => onMoveAnchor(0, -0.035)}>
+          <IconButton label="Move frame up" disabled={!canUseAnchor} onClick={() => onMoveAnchor(0, -0.035)}>
             <ArrowUp className="h-3.5 w-3.5" />
           </IconButton>
           <span />
-          <IconButton label="Move frame left" onClick={() => onMoveAnchor(-0.035, 0)}>
+          <IconButton label="Move frame left" disabled={!canUseAnchor} onClick={() => onMoveAnchor(-0.035, 0)}>
             <ArrowLeft className="h-3.5 w-3.5" />
           </IconButton>
-          <IconButton label="Move frame down" onClick={() => onMoveAnchor(0, 0.035)}>
+          <IconButton label="Move frame down" disabled={!canUseAnchor} onClick={() => onMoveAnchor(0, 0.035)}>
             <ArrowDown className="h-3.5 w-3.5" />
           </IconButton>
-          <IconButton label="Move frame right" onClick={() => onMoveAnchor(0.035, 0)}>
+          <IconButton label="Move frame right" disabled={!canUseAnchor} onClick={() => onMoveAnchor(0.035, 0)}>
             <ArrowRight className="h-3.5 w-3.5" />
           </IconButton>
         </div>
@@ -223,10 +256,10 @@ export function ARToolbar({
         </div>
 
         <div className="flex flex-col gap-1">
-          <IconButton label="Make frame larger" onClick={() => onScaleAnchor(1.08)}>
+          <IconButton label="Make frame larger" disabled={!canUseAnchor} onClick={() => onScaleAnchor(1.08)}>
             <ZoomIn className="h-3.5 w-3.5" />
           </IconButton>
-          <IconButton label="Make frame smaller" onClick={() => onScaleAnchor(0.92)}>
+          <IconButton label="Make frame smaller" disabled={!canUseAnchor} onClick={() => onScaleAnchor(0.92)}>
             <ZoomOut className="h-3.5 w-3.5" />
           </IconButton>
         </div>
@@ -237,6 +270,7 @@ export function ARToolbar({
           label="Delete placed items"
           active={deleteMode}
           danger={deleteMode}
+          disabled={!canUseAnchor}
           onClick={toggleDeleteMode}
           className="h-10 w-full"
         >
@@ -245,7 +279,7 @@ export function ARToolbar({
 
         <Button
           onClick={onAutoFitSelected}
-          disabled={!selectedItemId || deleteMode}
+          disabled={!selectedItemId || deleteMode || !canUseAnchor}
           variant="outline"
           className="h-10 rounded-sm border-white/25 bg-white/10 font-pixel text-[8px] text-white hover:bg-white/20 disabled:opacity-40"
           title="Place selected item at its default plant position"
@@ -280,6 +314,8 @@ export function ARToolbar({
           {scanError}
         </p>
       )}
+        </div>
+      )}
     </div>
   )
 }
@@ -289,6 +325,7 @@ function IconButton({
   active,
   danger,
   className,
+  disabled,
   onClick,
   children,
 }: {
@@ -296,6 +333,7 @@ function IconButton({
   active?: boolean
   danger?: boolean
   className?: string
+  disabled?: boolean
   onClick: () => void
   children: ReactNode
 }) {
@@ -304,9 +342,10 @@ function IconButton({
       type="button"
       aria-label={label}
       title={label}
+      disabled={disabled}
       onClick={onClick}
       className={cn(
-        'flex h-8 w-8 items-center justify-center rounded-sm border transition-all',
+        'flex h-8 w-8 items-center justify-center rounded-sm border transition-all disabled:pointer-events-none disabled:opacity-35',
         active
           ? danger
             ? 'border-red-400 bg-red-500/35 text-red-50'

@@ -1,5 +1,6 @@
 'use client'
 
+import { ClipboardList, Droplets, Leaf, Pill, ScanLine, Sparkles, TreeDeciduous } from 'lucide-react'
 import { useGameStore, CareLog } from '@/lib/store'
 import {
   Sheet,
@@ -14,13 +15,13 @@ interface CareHistorySheetProps {
   onOpenChange: (open: boolean) => void
 }
 
-const ACTION_ICONS: Record<CareLog['action'], string> = {
-  water: '💧',
-  wipe: '🍃',
-  fertilize: '🌿',
-  scan: '🔍',
-  decorate: '✨',
-  cure: '💊',
+const ACTION_ICONS: Record<CareLog['action'], React.ReactNode> = {
+  water: <Droplets className="h-4 w-4 text-blue-500" />,
+  wipe: <Leaf className="h-4 w-4 text-green-600" />,
+  fertilize: <TreeDeciduous className="h-4 w-4 text-green-500" />,
+  scan: <ScanLine className="h-4 w-4 text-purple-500" />,
+  decorate: <Sparkles className="h-4 w-4 text-amber-500" />,
+  cure: <Pill className="h-4 w-4 text-pink-500" />,
 }
 
 const ACTION_LABELS: Record<CareLog['action'], string> = {
@@ -56,25 +57,22 @@ export function CareHistorySheet({ open, onOpenChange }: CareHistorySheetProps) 
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[70vh] rounded-t-lg border-t-2 border-primary bg-card">
+      <SheetContent side="bottom" className="h-[65vh] rounded-t-lg border-t-2 border-primary bg-card/98 shadow-2xl sm:h-[55vh]">
         <SheetHeader>
           <SheetTitle className="font-pixel text-sm text-primary">
             Care History
           </SheetTitle>
           <SheetDescription className="text-sm text-muted-foreground">
-            Your recent plant care activities
+            Recent activity
           </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-4 h-[calc(100%-80px)] overflow-y-auto">
+        <div className="mt-4 h-[calc(100%-80px)] overflow-y-auto scrollbar-hide">
           {careLogs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <span className="text-4xl">📋</span>
+              <ClipboardList className="h-10 w-10 text-muted-foreground" aria-hidden="true" />
               <p className="mt-2 font-pixel text-[10px] text-muted-foreground">
                 No care history yet
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Start caring for your plants to see activities here
               </p>
             </div>
           ) : (
@@ -82,10 +80,12 @@ export function CareHistorySheet({ open, onOpenChange }: CareHistorySheetProps) 
               {careLogs.map((log) => (
                 <div
                   key={log.id}
-                  className="flex items-center gap-3 rounded-sm border border-border bg-secondary/50 p-3"
+                  className="flex items-center gap-3 rounded-lg border border-border bg-secondary/50 p-3 shadow-sm transition-colors hover:bg-secondary/70"
                 >
-                  <span className="text-xl">{ACTION_ICONS[log.action]}</span>
-                  <div className="flex-1 min-w-0">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-card ring-1 ring-border">
+                    {ACTION_ICONS[log.action]}
+                  </span>
+                  <div className="min-w-0 flex-1">
                     <p className="font-pixel text-[10px] text-foreground">
                       {ACTION_LABELS[log.action]}
                     </p>

@@ -1,5 +1,6 @@
 'use client'
 
+import { AlertTriangle, CheckCircle2, ShieldAlert } from 'lucide-react'
 import { DiagnosisResult, useGameStore } from '@/lib/store'
 import { Button } from '@/components/ui/button'
 import {
@@ -49,12 +50,14 @@ export function ScanResultModal({ result, plantId, open, onOpenChange }: ScanRes
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm rounded-sm border-2 border-primary bg-card">
+      <DialogContent className="max-w-sm rounded-lg border-2 border-primary bg-card">
         <DialogHeader className="text-center">
           <div className="mx-auto mb-2 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-            <span className="text-4xl">
-              {result.isHealthy ? '✅' : '⚠️'}
-            </span>
+            {result.isHealthy ? (
+              <CheckCircle2 className="h-8 w-8 text-primary" />
+            ) : (
+              <ShieldAlert className="h-8 w-8 text-destructive" />
+            )}
           </div>
           <DialogTitle className="font-pixel text-sm text-primary">
             {result.isHealthy ? 'Healthy Plant!' : 'Disease Detected'}
@@ -65,13 +68,14 @@ export function ScanResultModal({ result, plantId, open, onOpenChange }: ScanRes
         </DialogHeader>
 
         {/* Disease Info */}
-        <div className="mt-4 rounded-sm border border-border bg-secondary/50 p-4">
+        <div className="mt-4 rounded-lg border border-border bg-secondary/50 p-4">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="font-pixel text-[10px] text-foreground">
-              🌿 {result.disease}
+            <h3 className="flex items-center gap-1.5 font-pixel text-[10px] text-foreground">
+              <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+              {result.disease}
             </h3>
             {!result.isHealthy && (
-              <span className={`rounded-sm px-2 py-0.5 font-pixel text-[8px] ${getSeverityColor(result.severity)}`}>
+              <span className={`rounded-md px-2 py-0.5 font-pixel text-[8px] ${getSeverityColor(result.severity)}`}>
                 {getSeverityLabel(result.severity)}
               </span>
             )}
@@ -80,8 +84,9 @@ export function ScanResultModal({ result, plantId, open, onOpenChange }: ScanRes
           {/* Treatments */}
           {result.treatments && result.treatments.length > 0 && (
             <div className="mt-3">
-              <h4 className="font-pixel text-[8px] text-muted-foreground mb-2">
-                💊 Treatment Steps:
+              <h4 className="flex items-center gap-1.5 font-pixel text-[8px] text-muted-foreground mb-2">
+                <AlertTriangle className="h-3 w-3" />
+                Treatment Steps:
               </h4>
               <ol className="space-y-1.5">
                 {result.treatments.map((step, i) => (
@@ -102,21 +107,22 @@ export function ScanResultModal({ result, plantId, open, onOpenChange }: ScanRes
           {!result.isHealthy && plantId && (
             <Button
               onClick={handleCure}
-              className="flex-1 rounded-sm bg-accent font-pixel text-[10px] text-accent-foreground hover:bg-accent/90"
+              className="flex-1 rounded-md bg-accent font-pixel text-[10px] text-accent-foreground hover:bg-accent/90"
             >
-              ✨ Cured (+100 GC)
+              <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+              Cured (+100 GC)
             </Button>
           )}
           <Button
             onClick={() => onOpenChange(false)}
             variant={result.isHealthy ? 'default' : 'outline'}
-            className={`${result.isHealthy ? 'flex-1' : ''} rounded-sm font-pixel text-[10px] ${
+            className={`${result.isHealthy ? 'flex-1' : ''} rounded-md font-pixel text-[10px] ${
               result.isHealthy
                 ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                 : 'border-2 border-primary'
             }`}
           >
-            {result.isHealthy ? '🎉 Awesome!' : 'Close'}
+            {result.isHealthy ? 'Awesome!' : 'Close'}
           </Button>
         </div>
       </DialogContent>

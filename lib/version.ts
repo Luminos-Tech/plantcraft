@@ -2,10 +2,21 @@
  * App version — update this after each fix or feature change.
  * Format: major.minor.patch
  */
-export const APP_VERSION = '1.3.2'
+export const APP_VERSION = '1.4.4'
 
 /**
  * Changelog (latest first):
+ * 1.4.4 - Hide AR tracking box after plant detection so effects render cleanly
+ * 1.4.3 - Tighten AR placement: hide effects until plant tracking,
+ *         add green tracking feedback, pixel VFX, and collapsible AR tools
+ * 1.4.2 - Fix friend QR scan hanging on Loading by surfacing Firebase
+ *         read errors and adding a shared-plant loading timeout
+ * 1.4.1 - Add plant descriptions, save each owned plant to Firebase,
+ *         and include descriptions in public QR friend sync
+ * 1.4.0 - Add Mission board: daily care contracts, emergency plant rescue,
+ *         timed progress, claimable coin rewards, and bottom-nav Mission entry
+ * 1.3.3 - Fix mobile shop overflow: constrain page grid/container sizing,
+ *         keep filter scrolling local, and resize item cards for narrow screens
  * 1.3.2 - Fix friend sharing: direct share links, reliable public item sync,
  *         existing decoration publishing, scan-friend loading state
  * 1.3.1 - Improve AR tracking responsiveness: lighter camera input, faster

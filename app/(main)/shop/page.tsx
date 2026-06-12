@@ -1,6 +1,8 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { useState, useMemo } from 'react'
+import { Blocks, Coins, Glasses, Gift, LockKeyhole, Sparkles, Store, WandSparkles } from 'lucide-react'
 import { ShopItem, SHOP_ITEMS, useGameStore } from '@/lib/store'
 import { ShopItemCard } from '@/components/shop-item-card'
 import { ItemDetailSheet } from '@/components/item-detail-sheet'
@@ -8,13 +10,13 @@ import { cn } from '@/lib/utils'
 
 type FilterCategory = 'all' | ShopItem['category'] | 'rare'
 
-const FILTER_OPTIONS: { value: FilterCategory; label: string; icon: string }[] = [
-  { value: 'all', label: 'All', icon: '🎁' },
-  { value: 'hat', label: 'Hats', icon: '🎩' },
-  { value: 'glasses', label: 'Glasses', icon: '👓' },
-  { value: 'block', label: 'Blocks', icon: '🟫' },
-  { value: 'vfx', label: 'Effects', icon: '✨' },
-  { value: 'rare', label: 'Rare', icon: '🔒' },
+const FILTER_OPTIONS: { value: FilterCategory; label: string; icon: ReactNode }[] = [
+  { value: 'all', label: 'All', icon: <Gift className="h-3.5 w-3.5" /> },
+  { value: 'hat', label: 'Hats', icon: <Sparkles className="h-3.5 w-3.5" /> },
+  { value: 'glasses', label: 'Glasses', icon: <Glasses className="h-3.5 w-3.5" /> },
+  { value: 'block', label: 'Blocks', icon: <Blocks className="h-3.5 w-3.5" /> },
+  { value: 'vfx', label: 'Effects', icon: <WandSparkles className="h-3.5 w-3.5" /> },
+  { value: 'rare', label: 'Rare', icon: <LockKeyhole className="h-3.5 w-3.5" /> },
 ]
 
 export default function ShopPage() {
@@ -31,56 +33,63 @@ export default function ShopPage() {
   }, [selectedFilter])
 
   return (
-    <div className="min-h-full px-4 py-4">
-      {/* Header */}
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="font-pixel text-xs text-foreground">Item Shop</h2>
-        <div className="flex items-center gap-1.5">
-          <span className="text-lg">💰</span>
-          <span className="font-pixel text-xs text-accent">{coins} GC</span>
+    <div className="page-stack">
+      <section className="page-hero">
+        <div className="page-container flex flex-wrap items-center justify-between gap-3 py-4 sm:flex-nowrap sm:gap-4 sm:py-5">
+          <div className="min-w-0">
+            <span className="section-kicker font-pixel text-[8px]">
+              <Store className="h-3.5 w-3.5" aria-hidden="true" />
+              Item Market
+            </span>
+            <h2 className="text-balance mt-2.5 font-pixel text-sm text-foreground sm:text-base">Item Shop</h2>
+            <p className="mt-1.5 max-w-xl text-sm text-muted-foreground">Seasonal inventory</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2 rounded-md border border-accent/35 bg-accent/12 px-3 py-2">
+            <Coins className="h-5 w-5 text-accent" aria-hidden="true" />
+            <span className="font-pixel text-xs text-accent">{coins} GC</span>
+          </div>
         </div>
-      </div>
+      </section>
 
-      {/* Filter Tabs */}
-      <div className="mb-4 flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-        {FILTER_OPTIONS.map((option) => (
-          <button
-            key={option.value}
-            onClick={() => setSelectedFilter(option.value)}
-            className={cn(
-              'flex flex-shrink-0 items-center gap-1.5 rounded-sm border-2 px-3 py-1.5 transition-colors',
-              selectedFilter === option.value
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'border-border bg-card text-foreground hover:border-primary'
-            )}
-          >
-            <span className="text-sm">{option.icon}</span>
-            <span className="font-pixel text-[8px]">{option.label}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Items Grid */}
-      {filteredItems.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <span className="text-4xl">🏪</span>
-          <p className="mt-2 font-pixel text-[10px] text-muted-foreground">
-            No items in this category
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-3">
-          {filteredItems.map((item) => (
-            <ShopItemCard
-              key={item.id}
-              item={item}
-              onClick={() => setSelectedItem(item)}
-            />
+      <div className="page-container pt-0">
+        <div className="snap-scroll-x scrollbar-hide mb-4 flex min-w-0 max-w-full gap-2 overflow-x-auto pb-2 lg:flex-wrap lg:overflow-visible">
+          {FILTER_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              onClick={() => setSelectedFilter(option.value)}
+              className={cn(
+                'relative flex h-10 flex-shrink-0 items-center gap-1.5 rounded-md border-2 px-3 transition-all',
+                selectedFilter === option.value
+                  ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+                  : 'border-border bg-card/88 text-foreground hover:border-primary/60 hover:bg-secondary/70'
+              )}
+            >
+              {option.icon}
+              <span className="font-pixel text-[8px]">{option.label}</span>
+            </button>
           ))}
         </div>
-      )}
 
-      {/* Item Detail Sheet */}
+        {filteredItems.length === 0 ? (
+          <div className="surface-panel flex flex-col items-center justify-center py-16 text-center">
+            <Store className="h-10 w-10 text-muted-foreground" aria-hidden="true" />
+            <p className="mt-3 font-pixel text-[10px] text-muted-foreground">
+              No items in this category
+            </p>
+          </div>
+        ) : (
+          <div className="shop-grid">
+            {filteredItems.map((item) => (
+              <ShopItemCard
+                key={item.id}
+                item={item}
+                onClick={() => setSelectedItem(item)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
       <ItemDetailSheet
         item={selectedItem}
         open={!!selectedItem}

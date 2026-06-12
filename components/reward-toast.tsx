@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { Coins, Star } from 'lucide-react'
 
 interface RewardEvent {
   xp: number
@@ -41,7 +42,7 @@ export function RewardToast() {
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className="animate-reward-toast pointer-events-none rounded-sm border-2 border-accent px-5 py-3 shadow-lg"
+          className="animate-reward-toast pointer-events-none rounded-md border-2 border-accent px-5 py-3 shadow-lg"
           style={{
             background: 'rgba(0,0,0,0.85)',
             backdropFilter: 'blur(8px)',
@@ -50,14 +51,16 @@ export function RewardToast() {
           <div className="flex items-center gap-3">
             {/* XP indicator */}
             {toast.xp > 0 && (
-              <span className="font-pixel text-xs text-accent">
-                +{toast.xp} XP ⭐
+              <span className="flex items-center gap-1 font-pixel text-xs text-accent">
+                <Star className="h-3.5 w-3.5 fill-accent" aria-hidden="true" />
+                +{toast.xp} XP
               </span>
             )}
             {/* Coins indicator */}
             {toast.coins > 0 && (
-              <span className="font-pixel text-xs text-yellow-400">
-                +{toast.coins} 💰 GC
+              <span className="flex items-center gap-1 font-pixel text-xs text-yellow-400">
+                <Coins className="h-3.5 w-3.5" aria-hidden="true" />
+                +{toast.coins} GC
               </span>
             )}
           </div>

@@ -115,7 +115,8 @@ export class FilterEngine {
       const anchor = this.getRenderableAnchor()
       if (anchor) {
         this.drawItems(anchor, getItems())
-        this.drawAnchorFrame(anchor)
+      } else {
+        this.drawScanningGuide()
       }
 
       this.emitState()
@@ -143,7 +144,7 @@ export class FilterEngine {
     const anchor = this.getRenderableAnchor()
     const detected = this.hasFreshDetection()
     const locked = !!this.lockedAnchor
-    const source: ARAnchorSource | null = locked ? 'locked' : this.suggestedAnchor ? 'vision' : anchor ? 'manual' : null
+    const source: ARAnchorSource | null = locked ? 'locked' : detected && this.suggestedAnchor ? 'vision' : null
 
     return {
       anchor,
@@ -262,8 +263,8 @@ export class FilterEngine {
 
   private getRenderableAnchor(): BBox | null {
     if (this.lockedAnchor) return this.lockedAnchor
-    if (this.suggestedAnchor) return this.suggestedAnchor
-    return this.getDefaultAnchor()
+    if (this.suggestedAnchor && this.hasFreshDetection()) return this.suggestedAnchor
+    return null
   }
 
   private getDefaultAnchor(): BBox {
@@ -342,7 +343,7 @@ export class FilterEngine {
     const baseSize = category === 'vfx'
       ? Math.max(bw, bh) * item.scaleRatio
       : bw * item.scaleRatio
-    const size = this.clamp(baseSize, category === 'vfx' ? 90 : 30, Math.max(bw, bh) * 1.2)
+    const size = this.clamp(baseSize, category === 'vfx' ? 120 : 30, Math.max(bw, bh) * 1.35)
     const centerX = bx + bw * item.anchorX
     const centerY = by + bh * item.anchorY
 
@@ -350,7 +351,9 @@ export class FilterEngine {
     this.ctx.shadowColor = `${ITEM_COLORS[category] ?? '#5C8A3C'}66`
     this.ctx.shadowBlur = category === 'vfx' ? 18 : 10
 
-    if (item.itemId === 'hat-crown') {
+    if (category === 'vfx') {
+      this.drawVfx(anchor, item.itemId, size)
+    } else if (item.itemId === 'hat-crown') {
       this.drawCrown(centerX, centerY, size)
     } else if (item.itemId === 'hat-straw' || category === 'hat') {
       this.drawStrawHat(centerX, centerY, size)
@@ -360,10 +363,6 @@ export class FilterEngine {
       this.drawPixelGlasses(centerX, centerY, size)
     } else if (item.itemId === 'block-diamond') {
       this.drawDiamondBlock(centerX, centerY, size)
-    } else if (item.itemId === 'vfx-rainbow') {
-      this.drawRainbowAura(centerX, centerY, size)
-    } else if (item.itemId === 'vfx-sparkle' || category === 'vfx') {
-      this.drawSparkles(centerX, centerY, size)
     } else {
       this.drawDirtBlock(centerX, centerY, size)
     }
@@ -371,37 +370,24 @@ export class FilterEngine {
     this.ctx.restore()
   }
 
-  private drawAnchorFrame([x, y, w, h]: BBox): void {
-    const locked = !!this.lockedAnchor
-    const detected = this.hasFreshDetection()
-    const color = locked ? '#7AE582' : detected ? '#E8C547' : '#FFFFFF'
-    const label = locked ? 'LOCKED' : detected ? 'TRACKING' : 'ALIGN'
-    const alpha = locked ? 0.9 : 0.62
-    const corner = Math.min(34, Math.max(18, w * 0.08))
+  private drawScanningGuide(): void {
+    const width = this.getCanvasCssWidth()
+    const height = this.getCanvasCssHeight()
+    const size = Math.min(width * 0.5, height * 0.28, 220)
+    const x = (width - size) / 2
+    const y = Math.max(112, (height - size) / 2 - 24)
+    const corner = size * 0.22
 
     this.ctx.save()
-    this.ctx.globalAlpha = alpha
-    this.ctx.strokeStyle = color
-    this.ctx.lineWidth = locked ? 3 : 2
-    this.ctx.setLineDash(locked ? [] : [10, 8])
-    this.ctx.strokeRect(x, y, w, h)
-    this.ctx.setLineDash([])
-
-    this.ctx.lineWidth = 5
+    this.ctx.globalAlpha = 0.42
+    this.ctx.strokeStyle = '#FFFFFF'
+    this.ctx.lineWidth = 3
+    this.ctx.setLineDash([8, 8])
     this.drawCorner(x, y, corner, 'tl')
-    this.drawCorner(x + w, y, corner, 'tr')
-    this.drawCorner(x, y + h, corner, 'bl')
-    this.drawCorner(x + w, y + h, corner, 'br')
-
-    this.ctx.globalAlpha = 1
-    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.58)'
-    this.roundRect(x + 10, y + 10, 76, 24, 4)
-    this.ctx.fill()
-    this.ctx.fillStyle = color
-    this.ctx.font = '10px monospace'
-    this.ctx.textAlign = 'center'
-    this.ctx.textBaseline = 'middle'
-    this.ctx.fillText(label, x + 48, y + 22)
+    this.drawCorner(x + size, y, corner, 'tr')
+    this.drawCorner(x, y + size, corner, 'bl')
+    this.drawCorner(x + size, y + size, corner, 'br')
+    this.ctx.setLineDash([])
     this.ctx.restore()
   }
 
@@ -493,33 +479,50 @@ export class FilterEngine {
     this.pixelRect(x + p * 5, y + p * 5, p * 2, p * 2, '#FFFFFF')
   }
 
-  private drawSparkles(cx: number, cy: number, size: number): void {
+  private drawVfx(anchor: BBox, itemId: string, size: number): void {
+    if (itemId === 'vfx-rainbow') {
+      this.drawRainbowAura(anchor, size)
+      return
+    }
+    this.drawSparkles(anchor, size)
+  }
+
+  private drawSparkles([x, y, w, h]: BBox, size: number): void {
     const points = [
-      [0, -0.32, 1],
-      [-0.35, -0.06, 0.65],
-      [0.36, 0.05, 0.75],
-      [-0.16, 0.34, 0.55],
-      [0.2, 0.28, 0.5],
+      [0.22, 0.12, 1],
+      [0.72, 0.18, 0.75],
+      [0.14, 0.56, 0.65],
+      [0.84, 0.62, 0.68],
+      [0.48, 0.04, 0.55],
+      [0.58, 0.78, 0.58],
     ]
     this.ctx.save()
     this.ctx.globalAlpha = 0.9
-    for (const [dx, dy, scale] of points) {
-      this.drawStar(cx + dx * size, cy + dy * size, size * 0.12 * scale, '#F9E66B')
+    for (const [px, py, scale] of points) {
+      this.drawPixelStar(x + w * px, y + h * py, size * 0.09 * scale, '#F9E66B')
     }
     this.ctx.restore()
   }
 
-  private drawRainbowAura(cx: number, cy: number, size: number): void {
+  private drawRainbowAura([x, y, w, h]: BBox, size: number): void {
     this.ctx.save()
     this.ctx.globalAlpha = 0.74
-    this.ctx.lineCap = 'round'
     const colors = ['#E84A5F', '#F9A03F', '#F9E66B', '#4CAF50', '#4DD0E1', '#A855F7']
+    const block = Math.max(5, Math.round(size / 44))
     colors.forEach((color, index) => {
-      this.ctx.beginPath()
-      this.ctx.strokeStyle = color
-      this.ctx.lineWidth = Math.max(4, size * 0.018)
-      this.ctx.ellipse(cx, cy, size * (0.28 + index * 0.026), size * (0.38 + index * 0.018), 0, Math.PI * 1.08, Math.PI * 1.92)
-      this.ctx.stroke()
+      const inset = index * block * 1.7
+      const left = x + w * 0.12 + inset
+      const right = x + w * 0.88 - inset
+      const top = y + h * 0.08 + index * block * 1.3
+      const steps = 18 - index
+
+      for (let step = 0; step <= steps; step += 1) {
+        const t = step / steps
+        const px = left + (right - left) * t
+        const arc = Math.sin(Math.PI * t)
+        const py = top + h * 0.34 * (1 - arc)
+        this.pixelRect(px, py, block * 1.4, block * 1.4, color)
+      }
     })
     this.ctx.restore()
   }
@@ -532,7 +535,7 @@ export class FilterEngine {
     this.pixelRect(cx - p, cy + p * 2, p * 2, p * 1.5, color)
   }
 
-  private drawStar(cx: number, cy: number, size: number, color: string): void {
+  private drawPixelStar(cx: number, cy: number, size: number, color: string): void {
     this.pixelRect(cx - size * 0.2, cy - size, size * 0.4, size * 2, color)
     this.pixelRect(cx - size, cy - size * 0.2, size * 2, size * 0.4, color)
     this.pixelRect(cx - size * 0.45, cy - size * 0.45, size * 0.9, size * 0.9, '#FFFFFF')
