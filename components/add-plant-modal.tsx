@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Camera, ImagePlus, Plus, Upload } from 'lucide-react'
-import { useGameStore } from '@/lib/store'
+import { type Plant, useGameStore } from '@/lib/store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -17,9 +17,10 @@ import {
 interface AddPlantModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  plant?: Plant | null
 }
 
-export function AddPlantModal({ open, onOpenChange }: AddPlantModalProps) {
+export function AddPlantModal({ open, onOpenChange, plant }: AddPlantModalProps) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [imageUrl, setImageUrl] = useState('')
@@ -28,7 +29,8 @@ export function AddPlantModal({ open, onOpenChange }: AddPlantModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { addPlant } = useGameStore()
+  const { addPlant, updatePlant } = useGameStore()
+  const isEditing = !!plant
 
   const startCamera = useCallback(async () => {
     setCameraError(null)
@@ -92,6 +94,16 @@ export function AddPlantModal({ open, onOpenChange }: AddPlantModalProps) {
   }, [])
 
   useEffect(() => {
+    if (!open) return
+
+    setName(plant?.name ?? '')
+    setDescription(plant?.description ?? '')
+    setImageUrl(plant?.imageUrl ?? '')
+    setCameraError(null)
+    stopCamera()
+  }, [open, plant, stopCamera])
+
+  useEffect(() => {
     if (isCapturing && videoRef.current && streamRef.current) {
       videoRef.current.srcObject = streamRef.current
     }
@@ -129,7 +141,15 @@ export function AddPlantModal({ open, onOpenChange }: AddPlantModalProps) {
 
   const handleSubmit = () => {
     if (!name.trim()) return
-    addPlant(name.trim(), imageUrl, description.trim())
+    if (plant) {
+      updatePlant(plant.id, {
+        name: name.trim(),
+        description: description.trim(),
+        imageUrl,
+      })
+    } else {
+      addPlant(name.trim(), imageUrl, description.trim())
+    }
     setName('')
     setDescription('')
     setImageUrl('')
@@ -149,10 +169,10 @@ export function AddPlantModal({ open, onOpenChange }: AddPlantModalProps) {
       <DialogContent className="max-h-[90vh] max-w-sm overflow-y-auto rounded-lg border-2 border-primary bg-card/98 shadow-2xl scrollbar-hide sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-pixel text-sm text-primary">
-            Add New Plant
+            {isEditing ? 'Edit Plant' : 'Add New Plant'}
           </DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
-            Give your plant a name, note, and photo.
+            {isEditing ? 'Update the plant name, note, or photo.' : 'Give your plant a name, note, and photo.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -284,7 +304,7 @@ export function AddPlantModal({ open, onOpenChange }: AddPlantModalProps) {
             className="soft-button w-full rounded-md bg-primary font-pixel text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
-            Add Plant
+            {isEditing ? 'Save Changes' : 'Add Plant'}
           </Button>
         </div>
       </DialogContent>

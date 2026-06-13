@@ -132,6 +132,7 @@ interface GameState {
   
   // Actions
   addPlant: (name: string, imageUrl: string, description?: string) => void
+  updatePlant: (plantId: string, data: Partial<Pick<Plant, 'name' | 'description' | 'imageUrl'>>) => void
   removePlant: (plantId: string) => void
   waterPlant: (plantId: string) => boolean
   wipePlant: (plantId: string) => boolean
@@ -299,6 +300,24 @@ export const useGameStore = create<GameState>()(
         get().addCareLog(newPlant.id, 'water', 'Plant added')
         syncOwnedPlantRecord(newPlant, 100)
         dispatchRewardEvent(rewards.xp, rewards.coins, 'Add new plant')
+      },
+
+      updatePlant: (plantId, data) => {
+        set((state) => ({
+          plants: state.plants.map((plant) => {
+            if (plant.id !== plantId) return plant
+
+            return {
+              ...plant,
+              name: data.name !== undefined ? data.name.slice(0, 20) : plant.name,
+              description: data.description !== undefined ? data.description.slice(0, 160) : plant.description,
+              imageUrl: data.imageUrl !== undefined ? data.imageUrl : plant.imageUrl,
+            }
+          }),
+        }))
+
+        const updatedPlant = get().plants.find((plant) => plant.id === plantId)
+        if (updatedPlant) syncOwnedPlantRecord(updatedPlant, get().getPlantHp(plantId))
       },
       
       removePlant: (plantId) => {

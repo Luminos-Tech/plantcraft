@@ -651,25 +651,6 @@
   border-radius: 8px;
 }
 
-.map-player-pin {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  z-index: 4;
-  display: grid;
-  width: 4.75rem;
-  height: 4.75rem;
-  place-items: center;
-  border: 3px solid var(--card);
-  border-radius: 999px;
-  background: var(--primary);
-  color: var(--primary-foreground);
-  box-shadow:
-    0 0 0 8px rgba(47, 143, 91, 0.18),
-    0 12px 32px rgba(30, 47, 37, 0.18);
-  transform: translate(-50%, -50%);
-}
-
 .plant-map-marker {
   --marker-hp: 100%;
   position: absolute;
@@ -755,12 +736,6 @@
   box-shadow:
     0 0 0 3px rgba(246, 195, 91, 0.28),
     0 10px 22px rgba(30, 47, 37, 0.14);
-}
-
-.dashboard-action-strip {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.55rem;
 }
 
 .selected-plant-panel,
@@ -866,10 +841,6 @@
 }
 
 @media (max-width: 520px) {
-  .dashboard-action-strip {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .plant-map-marker {
     min-width: 4rem;
   }

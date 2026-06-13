@@ -1,11 +1,8 @@
 'use client'
 
-import Link from 'next/link'
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import {
   Activity,
-  Camera,
-  ClipboardList,
   Clock3,
   Droplets,
   History,
@@ -14,9 +11,7 @@ import {
   ScanLine,
   Sparkles,
   Sprout,
-  Store,
   TreeDeciduous,
-  Users,
 } from 'lucide-react'
 import { CARE_ACTION_COOLDOWN_MS, type Plant, useGameStore } from '@/lib/store'
 import { PlantCard } from '@/components/plant-card'
@@ -105,6 +100,7 @@ export default function DashboardPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [selectedPlantId, setSelectedPlantId] = useState<string | null>(null)
+  const [editingPlantId, setEditingPlantId] = useState<string | null>(null)
   const [clock, setClock] = useState(() => Date.now())
   const { plants, careLogs, getPlantHp, waterPlant, wipePlant } = useGameStore()
 
@@ -147,6 +143,7 @@ export default function DashboardPage() {
 
   const selectedStat = plantStats.find((stat) => stat.plant.id === selectedPlantId) ?? plantStats[0]
   const selectedPlant = selectedStat?.plant
+  const editingPlant = plants.find((plant) => plant.id === editingPlantId) ?? null
   const healthyCount = plantStats.filter((stat) => stat.status === 'healthy').length
   const urgentCount = plantStats.filter((stat) => stat.status === 'critical' || stat.status === 'diagnosis').length
   const gardenStability = plants.length > 0 ? Math.round((healthyCount / plants.length) * 100) : 0
@@ -243,9 +240,6 @@ export default function DashboardPage() {
             <div className="garden-map-shell min-h-[360px]">
               <div className="garden-map-surface">
                 <div className="map-scan-ring" />
-                <div className="map-player-pin">
-                  <Sprout className="h-6 w-6" aria-hidden="true" />
-                </div>
                 <div className="map-status-pill">
                   <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
                   <span className="font-pixel text-[7px]">Ready</span>
@@ -271,15 +265,6 @@ export default function DashboardPage() {
                   <div className="map-compass">
                     <ScanLine className="h-4 w-4" aria-hidden="true" />
                   </div>
-
-                  <button
-                    type="button"
-                    className="map-player-pin"
-                    onClick={() => selectedPlant && setSelectedPlantId(selectedPlant.id)}
-                    aria-label={selectedPlant ? `Focus ${selectedPlant.name}` : 'Garden focus'}
-                  >
-                    <Sprout className="h-6 w-6" aria-hidden="true" />
-                  </button>
 
                   {plantStats.map((stat) => {
                     const isSelected = stat.plant.id === selectedStat?.plant.id
@@ -317,46 +302,6 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="dashboard-action-strip">
-                <Button
-                  onClick={() => setIsAddModalOpen(true)}
-                  className="soft-button rounded-md bg-primary font-pixel text-[9px] text-primary-foreground hover:bg-primary/90"
-                >
-                  <Plus className="h-4 w-4" aria-hidden="true" />
-                  Add
-                </Button>
-                <Button
-                  asChild
-                  variant="outline"
-                  className="soft-button rounded-md border-primary/60 bg-card/90 font-pixel text-[9px] text-foreground hover:bg-secondary"
-                >
-                  <Link href={selectedPlant ? `/camera?plantId=${selectedPlant.id}` : '/camera'}>
-                    <Camera className="h-4 w-4" aria-hidden="true" />
-                    AR
-                  </Link>
-                </Button>
-                <Button
-                  asChild
-                  variant="outline"
-                  className="soft-button rounded-md border-accent/70 bg-card/90 font-pixel text-[9px] text-foreground hover:bg-accent/20"
-                >
-                  <Link href="/shop">
-                    <Store className="h-4 w-4" aria-hidden="true" />
-                    Shop
-                  </Link>
-                </Button>
-                <Button
-                  asChild
-                  variant="outline"
-                  className="soft-button rounded-md border-primary/40 bg-card/90 font-pixel text-[9px] text-foreground hover:bg-secondary"
-                >
-                  <Link href="/scan-friend">
-                    <Users className="h-4 w-4" aria-hidden="true" />
-                    Scan
-                  </Link>
-                </Button>
-              </div>
-
               {selectedPlant && (
                 <div className="selected-plant-panel">
                   <div className="mb-3 flex items-center justify-between gap-3">
@@ -369,7 +314,11 @@ export default function DashboardPage() {
                       <div className="font-pixel text-[6px] text-muted-foreground">HP</div>
                     </div>
                   </div>
-                  <PlantCard plant={selectedPlant} compact />
+                  <PlantCard
+                    plant={selectedPlant}
+                    compact
+                    onEdit={(plant) => setEditingPlantId(plant.id)}
+                  />
                 </div>
               )}
             </section>
@@ -465,11 +414,11 @@ export default function DashboardPage() {
                 </div>
                 <Button
                   variant="outline"
-                  onClick={() => setIsHistoryOpen(true)}
-                  className="hidden rounded-md border-primary/50 bg-card/90 font-pixel text-[8px] sm:inline-flex"
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="rounded-md border-primary/50 bg-card/90 font-pixel text-[8px]"
                 >
-                  <ClipboardList className="h-4 w-4" aria-hidden="true" />
-                  History
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  Add
                 </Button>
               </div>
               <div className="plant-grid">
@@ -481,6 +430,7 @@ export default function DashboardPage() {
                     selected={plant.id === selectedPlant?.id}
                     className="plant-card-selector"
                     onSelect={() => setSelectedPlantId(plant.id)}
+                    onEdit={(plant) => setEditingPlantId(plant.id)}
                   />
                 ))}
               </div>
@@ -490,7 +440,14 @@ export default function DashboardPage() {
       </div>
 
       {/* Modals */}
-      <AddPlantModal open={isAddModalOpen} onOpenChange={setIsAddModalOpen} />
+      <AddPlantModal
+        open={isAddModalOpen || !!editingPlant}
+        onOpenChange={(open) => {
+          setIsAddModalOpen(open && !editingPlant)
+          if (!open) setEditingPlantId(null)
+        }}
+        plant={editingPlant}
+      />
       <CareHistorySheet open={isHistoryOpen} onOpenChange={setIsHistoryOpen} />
     </div>
   )

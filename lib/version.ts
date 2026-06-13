@@ -2,10 +2,12 @@
  * App version — update this after each fix or feature change.
  * Format: major.minor.patch
  */
-export const APP_VERSION = '1.4.5'
+export const APP_VERSION = '1.4.6'
 
 /**
  * Changelog (latest first):
+ * 1.4.6 - Clean up garden map controls, add per-plant settings,
+ *         and support editing or deleting plants from each card
  * 1.4.5 - Redesign AR scan result modal with stable mobile layout,
  *         clearer diagnosis states, and fixed action area
  * 1.4.4 - Hide AR tracking box after plant detection so effects render cleanly
