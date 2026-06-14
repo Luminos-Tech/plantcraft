@@ -2,21 +2,12 @@
 
 import { useRef, useState, type ReactNode } from 'react'
 import {
-  ArrowDown,
-  ArrowLeft,
-  ArrowRight,
-  ArrowUp,
-  Crosshair,
   EyeOff,
   ImageUp,
-  Lock,
   PanelBottomOpen,
   ScanLine,
   Sparkles,
   Trash2,
-  Unlock,
-  ZoomIn,
-  ZoomOut,
 } from 'lucide-react'
 import { ShopItem, SHOP_ITEMS, useGameStore, DiagnosisResult } from '@/lib/store'
 import { Button } from '@/components/ui/button'
@@ -34,11 +25,6 @@ interface ARToolbarProps {
   deleteMode: boolean
   onDeleteModeChange: (mode: boolean) => void
   arState: ARFrameState
-  onLockAnchor: () => void
-  onUnlockAnchor: () => void
-  onResetAnchor: () => void
-  onScaleAnchor: (factor: number) => void
-  onMoveAnchor: (dxRatio: number, dyRatio: number) => void
   onAutoFitSelected: () => void
 }
 
@@ -51,11 +37,6 @@ export function ARToolbar({
   deleteMode,
   onDeleteModeChange,
   arState,
-  onLockAnchor,
-  onUnlockAnchor,
-  onResetAnchor,
-  onScaleAnchor,
-  onMoveAnchor,
   onAutoFitSelected,
 }: ARToolbarProps) {
   const [isScanning, setIsScanning] = useState(false)
@@ -147,7 +128,7 @@ export function ARToolbar({
 
   const selectedItem = selectedItemId ? SHOP_ITEMS.find((item) => item.id === selectedItemId) : null
   const selectedLabel = selectedItem?.name.replace(/\s+/g, ' ').slice(0, 10)
-  const readyLabel = arState.locked ? 'LOCK' : arState.detected ? 'READY' : 'FIND'
+  const readyLabel = arState.locked || arState.detected ? 'READY' : 'FIND'
   const readyActive = arState.locked || arState.detected
   const canUseAnchor = arState.locked || arState.detected
 
@@ -178,142 +159,100 @@ export function ARToolbar({
 
       {isPanelOpen && (
         <div className="mx-auto w-full max-w-2xl rounded-lg border border-white/10 bg-black/58 px-3 pb-3 pt-2 shadow-2xl backdrop-blur-md">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <StatusPill active={readyActive} label={readyLabel} />
-          {selectedLabel && (
-            <StatusPill active label={selectedLabel} tone="accent" />
-          )}
-        </div>
-
-        <div className="flex items-center gap-1">
-          <IconButton
-            label="Hide AR controls"
-            onClick={() => setIsPanelOpen(false)}
-          >
-            <EyeOff className="h-4 w-4" />
-          </IconButton>
-          <IconButton
-            label="Reset plant frame"
-            onClick={onResetAnchor}
-          >
-            <Crosshair className="h-4 w-4" />
-          </IconButton>
-          <IconButton
-            label={arState.locked ? 'Unlock plant frame' : 'Lock plant frame'}
-            active={arState.locked}
-            disabled={!arState.locked && !arState.detected}
-            onClick={arState.locked ? onUnlockAnchor : onLockAnchor}
-          >
-            {arState.locked ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-          </IconButton>
-        </div>
-      </div>
-
-      <div className="mb-2 grid grid-cols-[auto_1fr_auto] items-center gap-2">
-        <div className="grid grid-cols-3 gap-1">
-          <span />
-          <IconButton label="Move frame up" disabled={!canUseAnchor} onClick={() => onMoveAnchor(0, -0.035)}>
-            <ArrowUp className="h-3.5 w-3.5" />
-          </IconButton>
-          <span />
-          <IconButton label="Move frame left" disabled={!canUseAnchor} onClick={() => onMoveAnchor(-0.035, 0)}>
-            <ArrowLeft className="h-3.5 w-3.5" />
-          </IconButton>
-          <IconButton label="Move frame down" disabled={!canUseAnchor} onClick={() => onMoveAnchor(0, 0.035)}>
-            <ArrowDown className="h-3.5 w-3.5" />
-          </IconButton>
-          <IconButton label="Move frame right" disabled={!canUseAnchor} onClick={() => onMoveAnchor(0.035, 0)}>
-            <ArrowRight className="h-3.5 w-3.5" />
-          </IconButton>
-        </div>
-
-        <div className="min-w-0 overflow-hidden rounded-sm border border-white/15 bg-black/25 p-1">
-          {ownedShopItems.length > 0 ? (
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-              {ownedShopItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => handleItemSelect(item)}
-                  className={cn(
-                    'flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-sm border-2 bg-white/10 transition-all',
-                    selectedItemId === item.id
-                      ? 'scale-105 border-accent bg-accent/25'
-                      : 'border-white/25 hover:border-white/60',
-                    deleteMode && 'pointer-events-none opacity-35'
-                  )}
-                  title={item.name}
-                >
-                  <ItemThumb item={item} />
-                </button>
-              ))}
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <StatusPill active={readyActive} label={readyLabel} />
+              {selectedLabel && (
+                <StatusPill active label={selectedLabel} tone="accent" />
+              )}
             </div>
-          ) : (
-            <div className="flex h-12 items-center justify-center px-3 text-center font-pixel text-[8px] text-white/70">
-              Buy items from Shop to decorate.
+
+            <div className="flex items-center gap-1">
+              <IconButton
+                label="Hide AR controls"
+                onClick={() => setIsPanelOpen(false)}
+              >
+                <EyeOff className="h-4 w-4" />
+              </IconButton>
             </div>
+          </div>
+
+          <div className="mb-2 min-w-0 overflow-hidden rounded-sm border border-white/15 bg-black/25 p-1">
+            {ownedShopItems.length > 0 ? (
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                {ownedShopItems.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => handleItemSelect(item)}
+                    className={cn(
+                      'flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-sm border-2 bg-white/10 transition-all',
+                      selectedItemId === item.id
+                        ? 'scale-105 border-accent bg-accent/25'
+                        : 'border-white/25 hover:border-white/60',
+                      deleteMode && 'pointer-events-none opacity-35'
+                    )}
+                    title={item.name}
+                  >
+                    <ItemThumb item={item} />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="flex h-12 items-center justify-center px-3 text-center font-pixel text-[8px] text-white/70">
+                Buy items from Shop to decorate.
+              </div>
+            )}
+          </div>
+
+          <div className="mb-2 grid grid-cols-[44px_1fr_1fr] gap-2">
+            <IconButton
+              label="Delete placed items"
+              active={deleteMode}
+              danger={deleteMode}
+              disabled={!canUseAnchor}
+              onClick={toggleDeleteMode}
+              className="h-10 w-full"
+            >
+              <Trash2 className="h-4 w-4" />
+            </IconButton>
+
+            <Button
+              onClick={onAutoFitSelected}
+              disabled={!selectedItemId || deleteMode || !canUseAnchor}
+              variant="outline"
+              className="h-10 rounded-sm border-white/25 bg-white/10 font-pixel text-[8px] text-white hover:bg-white/20 disabled:opacity-40"
+              title="Place selected item at its default plant position"
+            >
+              <Sparkles className="h-4 w-4" />
+              Fit
+            </Button>
+
+            <Button
+              onClick={handleScan}
+              disabled={isScanning}
+              className="h-10 rounded-sm bg-primary font-pixel text-[8px] text-primary-foreground hover:bg-primary/90 disabled:opacity-70"
+              title="Scan plant health"
+            >
+              {isScanning ? <Spinner className="h-4 w-4" /> : <ScanLine className="h-4 w-4" />}
+              Scan
+            </Button>
+          </div>
+
+          <Button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isScanning}
+            variant="outline"
+            className="h-9 w-full rounded-sm border-white/20 bg-black/25 font-pixel text-[8px] text-white hover:bg-white/10 disabled:opacity-70"
+          >
+            <ImageUp className="h-4 w-4" />
+            Upload Photo
+          </Button>
+
+          {scanError && (
+            <p className="mt-2 text-center font-pixel text-[8px] text-red-300">
+              {scanError}
+            </p>
           )}
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <IconButton label="Make frame larger" disabled={!canUseAnchor} onClick={() => onScaleAnchor(1.08)}>
-            <ZoomIn className="h-3.5 w-3.5" />
-          </IconButton>
-          <IconButton label="Make frame smaller" disabled={!canUseAnchor} onClick={() => onScaleAnchor(0.92)}>
-            <ZoomOut className="h-3.5 w-3.5" />
-          </IconButton>
-        </div>
-      </div>
-
-      <div className="mb-2 grid grid-cols-[44px_1fr_1fr] gap-2">
-        <IconButton
-          label="Delete placed items"
-          active={deleteMode}
-          danger={deleteMode}
-          disabled={!canUseAnchor}
-          onClick={toggleDeleteMode}
-          className="h-10 w-full"
-        >
-          <Trash2 className="h-4 w-4" />
-        </IconButton>
-
-        <Button
-          onClick={onAutoFitSelected}
-          disabled={!selectedItemId || deleteMode || !canUseAnchor}
-          variant="outline"
-          className="h-10 rounded-sm border-white/25 bg-white/10 font-pixel text-[8px] text-white hover:bg-white/20 disabled:opacity-40"
-          title="Place selected item at its default plant position"
-        >
-          <Sparkles className="h-4 w-4" />
-          Fit
-        </Button>
-
-        <Button
-          onClick={handleScan}
-          disabled={isScanning}
-          className="h-10 rounded-sm bg-primary font-pixel text-[8px] text-primary-foreground hover:bg-primary/90 disabled:opacity-70"
-          title="Scan plant health"
-        >
-          {isScanning ? <Spinner className="h-4 w-4" /> : <ScanLine className="h-4 w-4" />}
-          Scan
-        </Button>
-      </div>
-
-      <Button
-        onClick={() => fileInputRef.current?.click()}
-        disabled={isScanning}
-        variant="outline"
-        className="h-9 w-full rounded-sm border-white/20 bg-black/25 font-pixel text-[8px] text-white hover:bg-white/10 disabled:opacity-70"
-      >
-        <ImageUp className="h-4 w-4" />
-        Upload Photo
-      </Button>
-
-      {scanError && (
-        <p className="mt-2 text-center font-pixel text-[8px] text-red-300">
-          {scanError}
-        </p>
-      )}
         </div>
       )}
     </div>

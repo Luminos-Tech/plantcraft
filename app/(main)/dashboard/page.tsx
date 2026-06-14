@@ -8,7 +8,6 @@ import {
   History,
   Leaf,
   Plus,
-  ScanLine,
   Sparkles,
   Sprout,
   TreeDeciduous,
@@ -260,10 +259,6 @@ export default function DashboardPage() {
                   <div className="map-status-pill">
                     <Activity className="h-3.5 w-3.5" aria-hidden="true" />
                     <span className="font-pixel text-[7px]">{gardenStability}% stable</span>
-                  </div>
-
-                  <div className="map-compass">
-                    <ScanLine className="h-4 w-4" aria-hidden="true" />
                   </div>
 
                   {plantStats.map((stat) => {

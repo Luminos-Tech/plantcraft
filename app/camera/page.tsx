@@ -172,31 +172,6 @@ function CameraContent() {
     }
   }, [plantId, isFriendMode, friendPlantId])
 
-  const lockAnchor = useCallback(() => {
-    const state = engineRef.current?.lockAnchor()
-    if (state) setArState(state)
-  }, [])
-
-  const unlockAnchor = useCallback(() => {
-    const state = engineRef.current?.unlockAnchor()
-    if (state) setArState(state)
-  }, [])
-
-  const resetAnchor = useCallback(() => {
-    const state = engineRef.current?.resetAnchor()
-    if (state) setArState(state)
-  }, [])
-
-  const scaleAnchor = useCallback((factor: number) => {
-    const state = engineRef.current?.scaleLockedAnchor(factor)
-    if (state) setArState(state)
-  }, [])
-
-  const moveAnchor = useCallback((dxRatio: number, dyRatio: number) => {
-    const state = engineRef.current?.moveLockedAnchor(dxRatio, dyRatio)
-    if (state) setArState(state)
-  }, [])
-
   const ensureLockedAnchor = useCallback(() => {
     const engine = engineRef.current
     if (!engine) return null
@@ -289,7 +264,18 @@ function CameraContent() {
   if (!plantId && !isFriendMode) {
     return (
       <div className="flex h-screen flex-col bg-background p-4 pt-12">
-        <h1 className="mb-6 text-center font-pixel text-lg text-foreground">Select a Plant for AR</h1>
+        <div className="mb-6 grid grid-cols-[auto_1fr_auto] items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push('/dashboard')}
+            className="rounded-md border-primary/40 bg-card/90 font-pixel text-[8px]"
+          >
+            <ArrowLeft className="h-4 w-4" /> Back
+          </Button>
+          <h1 className="text-center font-pixel text-sm text-foreground sm:text-lg">Select a Plant for AR</h1>
+          <span className="h-8 w-[72px]" aria-hidden="true" />
+        </div>
         {plants.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center">
             <Leaf className="h-10 w-10 text-muted-foreground" />
@@ -377,11 +363,6 @@ function CameraContent() {
                 if (mode) setSelectedItemId(null)
               }}
               arState={arState}
-              onLockAnchor={lockAnchor}
-              onUnlockAnchor={unlockAnchor}
-              onResetAnchor={resetAnchor}
-              onScaleAnchor={scaleAnchor}
-              onMoveAnchor={moveAnchor}
               onAutoFitSelected={handleAutoFitSelected}
             />
           )}
@@ -489,11 +470,9 @@ function ARStatusOverlay({
   isFriendMode: boolean
 }) {
   const isReady = arState.locked || arState.detected
-  const statusText = arState.locked
-    ? 'Anchor locked'
-    : arState.detected
+  const statusText = arState.locked || arState.detected
       ? 'Plant found'
-      : 'Align frame'
+      : 'Find plant'
   const actionText = isFriendMode
     ? 'Shared view'
     : deleteMode
