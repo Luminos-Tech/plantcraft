@@ -63,6 +63,7 @@ const ITEM_DECORATION_OVERRIDES: Record<string, Partial<DecorationPlacement>> = 
   'block-dirt': { anchorX: 0.78, anchorY: 0.84, scaleRatio: 0.32 },
   'vfx-rainbow': { anchorY: 0.58, scaleRatio: 0.98 },
   'vfx-sparkle': { anchorY: 0.6, scaleRatio: 0.86 },
+  'vfx-victory-aurora': { anchorY: 0.56, scaleRatio: 1.04 },
 }
 
 function isDecorationSlot(value: unknown): value is DecorationSlot {
@@ -128,6 +129,7 @@ export interface ShopItem {
   rarity: 'common' | 'rare' | 'legendary'
   imageUrl: string
   createdAt: Date
+  exclusive?: boolean
 }
 
 export interface OwnedItem {
@@ -174,6 +176,13 @@ export interface MissionClaim {
   periodKey: string
   coinsDelta: number
   claimedAt: number
+}
+
+export interface TournamentVote {
+  monthKey: string
+  category: 'style' | 'care'
+  candidateId: string
+  votedAt: number
 }
 
 // ===== REWARD TABLE =====
@@ -269,6 +278,13 @@ export function getDayKey(timestamp = Date.now()) {
   return `${year}-${month}-${day}`
 }
 
+export function getMonthKey(timestamp = Date.now()) {
+  const date = new Date(timestamp)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  return `${year}-${month}`
+}
+
 // ===== STORE INTERFACE =====
 
 interface GameState {
@@ -289,6 +305,8 @@ interface GameState {
   // Reward History
   rewardHistory: RewardLog[]
   missionClaims: MissionClaim[]
+  tournamentVotes: TournamentVote[]
+  tournamentRewardClaims: string[]
 
   // User Profile
   userProfile: UserProfile
@@ -315,6 +333,8 @@ interface GameState {
   addXp: (amount: number) => void
   addCoins: (amount: number) => void
   claimMissionReward: (missionId: string, periodKey: string, coins: number) => boolean
+  castTournamentVote: (monthKey: string, category: TournamentVote['category'], candidateId: string) => boolean
+  claimTournamentReward: (monthKey: string) => boolean
   
   // Care Logs
   addCareLog: (plantId: string, action: CareLog['action'], notes?: string) => void
@@ -408,29 +428,46 @@ function blobToAvatarDataUrl(blob: Blob): Promise<string> {
   if (typeof window === 'undefined') return Promise.resolve('')
 
   return new Promise((resolve) => {
+    let settled = false
+    const finish = (value: string) => {
+      if (settled) return
+      settled = true
+      resolve(value)
+    }
+
     const reader = new FileReader()
-    reader.onerror = () => resolve('')
+    reader.onerror = () => finish('')
     reader.onload = () => {
+      const fallbackDataUrl = typeof reader.result === 'string' ? reader.result : ''
+      if (!fallbackDataUrl) {
+        finish('')
+        return
+      }
+
       const img = new Image()
       img.onload = () => {
-        const canvas = document.createElement('canvas')
-        const size = 160
-        canvas.width = size
-        canvas.height = size
-        const ctx = canvas.getContext('2d')
-        if (!ctx) {
-          resolve('')
-          return
-        }
+        try {
+          const canvas = document.createElement('canvas')
+          const size = 160
+          canvas.width = size
+          canvas.height = size
+          const ctx = canvas.getContext('2d')
+          if (!ctx) {
+            finish(fallbackDataUrl)
+            return
+          }
 
-        const cropSize = Math.min(img.width, img.height)
-        const cropX = (img.width - cropSize) / 2
-        const cropY = (img.height - cropSize) / 2
-        ctx.drawImage(img, cropX, cropY, cropSize, cropSize, 0, 0, size, size)
-        resolve(canvas.toDataURL('image/jpeg', 0.78))
+          const cropSize = Math.min(img.width, img.height)
+          const cropX = (img.width - cropSize) / 2
+          const cropY = (img.height - cropSize) / 2
+          ctx.drawImage(img, cropX, cropY, cropSize, cropSize, 0, 0, size, size)
+          finish(canvas.toDataURL('image/jpeg', 0.78))
+        } catch {
+          finish(fallbackDataUrl)
+        }
       }
-      img.onerror = () => resolve('')
-      img.src = String(reader.result ?? '')
+      img.onerror = () => finish(fallbackDataUrl)
+      img.src = fallbackDataUrl
     }
     reader.readAsDataURL(blob)
   })
@@ -538,6 +575,8 @@ export const useGameStore = create<GameState>()(
       careLogs: [],
       rewardHistory: [],
       missionClaims: [],
+      tournamentVotes: [],
+      tournamentRewardClaims: [],
       friendPlants: [],
       userProfile: getDefaultUserProfile(),
       
@@ -966,6 +1005,52 @@ export const useGameStore = create<GameState>()(
         dispatchRewardEvent(0, rewardCoins, 'Mission reward')
         return true
       },
+
+      castTournamentVote: (monthKey, category, candidateId) => {
+        if (!monthKey || !candidateId) return false
+
+        set((state) => {
+          const nextVote: TournamentVote = {
+            monthKey,
+            category,
+            candidateId,
+            votedAt: Date.now(),
+          }
+          return {
+            tournamentVotes: [
+              ...(state.tournamentVotes ?? []).filter((vote) => (
+                vote.monthKey !== monthKey || vote.category !== category
+              )),
+              nextVote,
+            ],
+          }
+        })
+        return true
+      },
+
+      claimTournamentReward: (monthKey) => {
+        if (!monthKey) return false
+        const claimKey = `${monthKey}:vfx-victory-aurora`
+        const alreadyClaimed = (get().tournamentRewardClaims ?? []).includes(claimKey)
+        if (alreadyClaimed) return false
+
+        set((state) => ({
+          ownedItems: state.ownedItems.some((item) => item.itemId === 'vfx-victory-aurora')
+            ? state.ownedItems
+            : [
+                ...state.ownedItems,
+                {
+                  itemId: 'vfx-victory-aurora',
+                  purchasedAt: Date.now(),
+                },
+              ],
+          tournamentRewardClaims: [
+            ...(state.tournamentRewardClaims ?? []),
+            claimKey,
+          ],
+        }))
+        return true
+      },
       
       // ── Care Logs ──
 
@@ -1114,15 +1199,7 @@ export const useGameStore = create<GameState>()(
           const localPreviewUrl = await blobToAvatarDataUrl(blob)
           if (!localPreviewUrl) return false
 
-          const currentProfile = get().userProfile ?? getDefaultUserProfile()
-          set({
-            userProfile: {
-              ...getDefaultUserProfile(),
-              ...currentProfile,
-              avatarUrl: localPreviewUrl,
-              updatedAt: Date.now(),
-            },
-          })
+          get().updateUserAvatar(localPreviewUrl)
           return true
         } catch (error) {
           console.warn('Avatar preview failed', error)
@@ -1164,6 +1241,8 @@ export const useGameStore = create<GameState>()(
             careLogs: [],
             rewardHistory: [],
             missionClaims: [],
+            tournamentVotes: [],
+            tournamentRewardClaims: [],
             friendPlants: [],
             userProfile: getDefaultUserProfile(),
           }
@@ -1191,6 +1270,8 @@ export const useGameStore = create<GameState>()(
           careLogs: state.careLogs ?? [],
           rewardHistory: state.rewardHistory ?? [],
           missionClaims: state.missionClaims ?? [],
+          tournamentVotes: state.tournamentVotes ?? [],
+          tournamentRewardClaims: state.tournamentRewardClaims ?? [],
           friendPlants: state.friendPlants ?? [],
           userProfile: {
             ...getDefaultUserProfile(),
@@ -1208,6 +1289,8 @@ export const useGameStore = create<GameState>()(
         careLogs: state.careLogs,
         rewardHistory: state.rewardHistory,
         missionClaims: state.missionClaims,
+        tournamentVotes: state.tournamentVotes,
+        tournamentRewardClaims: state.tournamentRewardClaims,
         friendPlants: state.friendPlants,
         userProfile: state.userProfile,
       }),
@@ -1297,5 +1380,16 @@ export const SHOP_ITEMS: ShopItem[] = [
     rarity: 'rare',
     imageUrl: '/items/vfx-rainbow.png',
     createdAt: new Date('2024-03-01'),
+  },
+  {
+    id: 'vfx-victory-aurora',
+    name: 'Victory Aurora',
+    description: 'Exclusive monthly tournament AR reward with golden orbit and aurora ribbons.',
+    price: 0,
+    category: 'vfx',
+    rarity: 'legendary',
+    imageUrl: '/items/vfx-victory-aurora.png',
+    createdAt: new Date('2026-06-15'),
+    exclusive: true,
   },
 ]

@@ -25,11 +25,12 @@ export default function ShopPage() {
   const { coins } = useGameStore()
 
   const filteredItems = useMemo(() => {
-    if (selectedFilter === 'all') return SHOP_ITEMS
+    const shopItems = SHOP_ITEMS.filter((item) => !item.exclusive)
+    if (selectedFilter === 'all') return shopItems
     if (selectedFilter === 'rare') {
-      return SHOP_ITEMS.filter((item) => item.rarity === 'rare' || item.rarity === 'legendary')
+      return shopItems.filter((item) => item.rarity === 'rare' || item.rarity === 'legendary')
     }
-    return SHOP_ITEMS.filter((item) => item.category === selectedFilter)
+    return shopItems.filter((item) => item.category === selectedFilter)
   }, [selectedFilter])
 
   return (

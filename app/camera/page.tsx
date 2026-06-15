@@ -24,6 +24,46 @@ function getItemCategory(itemId: string) {
   return SHOP_ITEMS.find((item) => item.id === itemId)?.category ?? 'block'
 }
 
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('Could not read captured plant photo.'))
+    reader.onload = () => {
+      const fallbackDataUrl = typeof reader.result === 'string' ? reader.result : ''
+      if (!fallbackDataUrl) {
+        reject(new Error('Captured plant photo was empty.'))
+        return
+      }
+
+      const img = new Image()
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas')
+          const size = 256
+          canvas.width = size
+          canvas.height = size
+          const ctx = canvas.getContext('2d')
+          if (!ctx) {
+            resolve(fallbackDataUrl)
+            return
+          }
+
+          const cropSize = Math.min(img.width, img.height)
+          const cropX = (img.width - cropSize) / 2
+          const cropY = (img.height - cropSize) / 2
+          ctx.drawImage(img, cropX, cropY, cropSize, cropSize, 0, 0, size, size)
+          resolve(canvas.toDataURL('image/jpeg', 0.8))
+        } catch {
+          resolve(fallbackDataUrl)
+        }
+      }
+      img.onerror = () => resolve(fallbackDataUrl)
+      img.src = fallbackDataUrl
+    }
+    reader.readAsDataURL(blob)
+  })
+}
+
 function CameraContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -44,10 +84,10 @@ function CameraContent() {
   const [friendData, setFriendData] = useState<PublicPlantData | null>(null)
   const [deleteMode, setDeleteMode] = useState(false)
   const [arState, setArState] = useState<ARFrameState>(DEFAULT_AR_STATE)
-  const [isAvatarUploading, setIsAvatarUploading] = useState(false)
-  const [avatarStatus, setAvatarStatus] = useState<string | null>(null)
+  const [isPlantPhotoSaving, setIsPlantPhotoSaving] = useState(false)
+  const [plantPhotoStatus, setPlantPhotoStatus] = useState<string | null>(null)
 
-  const { plants, friendPlants, savePlacedItem, removePlacedItem, addCareLog, updateFriendPlant, updateAvatarFromBlob, syncAvatarFromBlob } = useGameStore()
+  const { plants, friendPlants, savePlacedItem, removePlacedItem, addCareLog, updateFriendPlant, updatePlant } = useGameStore()
   const plant = plants.find((p) => p.id === plantId)
   const selectedItem = selectedItemId ? SHOP_ITEMS.find((item) => item.id === selectedItemId) : null
 
@@ -254,32 +294,35 @@ function CameraContent() {
     }
   }
 
-  const handleCaptureAvatar = useCallback(async () => {
+  const handleCapturePlantPhoto = useCallback(async () => {
     const video = videoRef.current
     if (!video || video.readyState < 2) {
-      setAvatarStatus('Camera frame is not ready.')
-      window.setTimeout(() => setAvatarStatus(null), 2400)
+      setPlantPhotoStatus('Camera frame is not ready.')
+      window.setTimeout(() => setPlantPhotoStatus(null), 2400)
       return
     }
 
-    setIsAvatarUploading(true)
-    setAvatarStatus(null)
+    if (!plantId) {
+      setPlantPhotoStatus('Plant is not ready.')
+      window.setTimeout(() => setPlantPhotoStatus(null), 2400)
+      return
+    }
+
+    setIsPlantPhotoSaving(true)
+    setPlantPhotoStatus(null)
 
     try {
       const blob = await captureVideoFrame(video, { maxSize: 384, quality: 0.76 })
-      const previewUpdated = await updateAvatarFromBlob(blob)
-      setAvatarStatus(previewUpdated ? 'Avatar updated.' : 'Avatar preview failed.')
-
-      if (previewUpdated) {
-        void syncAvatarFromBlob(blob).catch(console.warn)
-      }
+      const imageUrl = await blobToDataUrl(blob)
+      updatePlant(plantId, { imageUrl })
+      setPlantPhotoStatus('Plant photo updated.')
     } catch {
-      setAvatarStatus('Avatar capture failed.')
+      setPlantPhotoStatus('Plant photo failed.')
     } finally {
-      setIsAvatarUploading(false)
-      window.setTimeout(() => setAvatarStatus(null), 2600)
+      setIsPlantPhotoSaving(false)
+      window.setTimeout(() => setPlantPhotoStatus(null), 2600)
     }
-  }, [syncAvatarFromBlob, updateAvatarFromBlob])
+  }, [plantId, updatePlant])
 
   if (!plantId && !isFriendMode) {
     return (
@@ -384,9 +427,9 @@ function CameraContent() {
               }}
               arState={arState}
               onPlaceSelected={handlePlaceSelected}
-              onCaptureAvatar={handleCaptureAvatar}
-              isAvatarUploading={isAvatarUploading}
-              avatarStatus={avatarStatus}
+              onCapturePlantPhoto={handleCapturePlantPhoto}
+              isPlantPhotoSaving={isPlantPhotoSaving}
+              plantPhotoStatus={plantPhotoStatus}
             />
           )}
 

@@ -2,10 +2,18 @@
  * App version — update this after each fix or feature change.
  * Format: major.minor.patch
  */
-export const APP_VERSION = '1.6.4'
+export const APP_VERSION = '1.7.3'
 
 /**
  * Changelog (latest first):
+ * 1.7.3 - Restore the fixed PlantCraft leaf logo and make AR Photo update
+ *         the current plant image immediately
+ * 1.7.2 - Pin neighbor count to the map top-right on mobile and make AR
+ *         neighbor map placement clearer on compact screens
+ * 1.7.1 - Add tournament category descriptions, vote-count rankings,
+ *         candidate detail previews, and the Victory Aurora reward effect
+ * 1.7.0 - Add daily care tips, monthly tournament voting, floating trophy
+ *         bubble, and exclusive tournament AR reward claim
  * 1.6.4 - Backfill neighbor map plant images from owned plant records and
  *         refresh same-day neighbor cache when cached nodes are missing images
  * 1.6.3 - Lower AR effect/aura placement and make avatar capture update

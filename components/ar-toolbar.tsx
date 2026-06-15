@@ -8,7 +8,7 @@ import {
   ScanLine,
   Sparkles,
   Trash2,
-  UserRound,
+  Camera,
 } from 'lucide-react'
 import { ShopItem, SHOP_ITEMS, useGameStore, DiagnosisResult } from '@/lib/store'
 import { Button } from '@/components/ui/button'
@@ -27,9 +27,9 @@ interface ARToolbarProps {
   onDeleteModeChange: (mode: boolean) => void
   arState: ARFrameState
   onPlaceSelected: () => void
-  onCaptureAvatar?: () => void
-  isAvatarUploading?: boolean
-  avatarStatus?: string | null
+  onCapturePlantPhoto?: () => void
+  isPlantPhotoSaving?: boolean
+  plantPhotoStatus?: string | null
 }
 
 export function ARToolbar({
@@ -42,9 +42,9 @@ export function ARToolbar({
   onDeleteModeChange,
   arState,
   onPlaceSelected,
-  onCaptureAvatar,
-  isAvatarUploading = false,
-  avatarStatus,
+  onCapturePlantPhoto,
+  isPlantPhotoSaving = false,
+  plantPhotoStatus,
 }: ARToolbarProps) {
   const [isScanning, setIsScanning] = useState(false)
   const [scanError, setScanError] = useState<string | null>(null)
@@ -245,14 +245,14 @@ export function ARToolbar({
             </Button>
 
             <Button
-              onClick={onCaptureAvatar}
-              disabled={!onCaptureAvatar || isAvatarUploading}
+              onClick={onCapturePlantPhoto}
+              disabled={!onCapturePlantPhoto || isPlantPhotoSaving}
               variant="outline"
               className="h-10 rounded-sm border-white/25 bg-white/10 font-pixel text-[8px] text-white hover:bg-white/20 disabled:opacity-40"
-              title="Capture current AR camera frame as your avatar"
+              title="Update this plant photo from the AR camera"
             >
-              {isAvatarUploading ? <Spinner className="h-4 w-4" /> : <UserRound className="h-4 w-4" />}
-              Avatar
+              {isPlantPhotoSaving ? <Spinner className="h-4 w-4" /> : <Camera className="h-4 w-4" />}
+              Photo
             </Button>
           </div>
 
@@ -271,9 +271,9 @@ export function ARToolbar({
               {scanError}
             </p>
           )}
-          {avatarStatus && (
+          {plantPhotoStatus && (
             <p className="mt-2 text-center font-pixel text-[8px] text-emerald-200">
-              {avatarStatus}
+              {plantPhotoStatus}
             </p>
           )}
         </div>
@@ -344,6 +344,7 @@ function ItemThumb({ item }: { item: ShopItem }) {
   if (item.id === 'glasses-heart') return <HeartGlassesThumb />
   if (item.category === 'glasses') return <GlassesThumb />
   if (item.id === 'block-diamond') return <DiamondThumb />
+  if (item.id === 'vfx-victory-aurora' || item.id === 'vfx-trophy-glow') return <VictoryAuroraThumb />
   if (item.id === 'vfx-rainbow') return <RainbowThumb />
   if (item.category === 'vfx') return <SparkleThumb />
   return <DirtThumb />
@@ -433,6 +434,23 @@ function RainbowThumb() {
       <path d="M6 20a10 10 0 0 1 20 0" fill="none" stroke="#E84A5F" strokeWidth="3" />
       <path d="M9 20a7 7 0 0 1 14 0" fill="none" stroke="#F9E66B" strokeWidth="3" />
       <path d="M12 20a4 4 0 0 1 8 0" fill="none" stroke="#4DD0E1" strokeWidth="3" />
+    </svg>
+  )
+}
+
+function VictoryAuroraThumb() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true">
+      <rect x="7" y="9" width="4" height="4" fill="#35E982" />
+      <rect x="11" y="7" width="4" height="4" fill="#F6C35B" />
+      <rect x="15" y="9" width="4" height="4" fill="#A5F3FC" />
+      <rect x="19" y="13" width="4" height="4" fill="#35E982" />
+      <rect x="15" y="17" width="4" height="4" fill="#F6C35B" />
+      <rect x="11" y="19" width="4" height="4" fill="#A5F3FC" />
+      <rect x="7" y="17" width="4" height="4" fill="#F6C35B" />
+      <rect x="5" y="5" width="3" height="3" fill="#FFFFFF" />
+      <rect x="24" y="6" width="3" height="3" fill="#FFFFFF" />
+      <rect x="25" y="22" width="2" height="2" fill="#F6C35B" />
     </svg>
   )
 }

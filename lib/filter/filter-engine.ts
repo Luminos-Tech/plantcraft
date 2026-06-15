@@ -415,6 +415,10 @@ export class FilterEngine {
       this.drawRainbowAura(anchor, size, offsetY)
       return
     }
+    if (itemId === 'vfx-victory-aurora' || itemId === 'vfx-trophy-glow') {
+      this.drawVictoryAurora(anchor, size, offsetY)
+      return
+    }
     this.drawSparkles(anchor, size, offsetY)
   }
 
@@ -455,6 +459,36 @@ export class FilterEngine {
         this.pixelRect(px, py, block * 1.4, block * 1.4, color)
       }
     })
+    this.ctx.restore()
+  }
+
+  private drawVictoryAurora([x, y, w, h]: BBox, size: number, offsetY: number): void {
+    const cx = x + w * 0.5
+    const cy = y + h * 0.5 + offsetY
+    const block = Math.max(5, Math.round(size / 42))
+    const radius = Math.min(size * 0.46, Math.max(w, h) * 0.58)
+
+    this.ctx.save()
+    this.ctx.globalAlpha = 0.86
+    const ribbons = ['#F6C35B', '#35E982', '#A5F3FC']
+    ribbons.forEach((color, ribbonIndex) => {
+      for (let step = 0; step <= 22; step += 1) {
+        const t = step / 22
+        const angle = t * Math.PI * 2 + ribbonIndex * 2.05
+        const px = cx + Math.cos(angle) * radius * (0.72 + ribbonIndex * 0.08)
+        const py = cy + Math.sin(angle * 1.35) * radius * 0.36 + (t - 0.5) * h * 0.36
+        this.pixelRect(px, py, block * 1.25, block * 1.25, color)
+      }
+    })
+    for (let i = 0; i < 16; i += 1) {
+      const angle = (Math.PI * 2 * i) / 16
+      const px = cx + Math.cos(angle) * radius
+      const py = cy + Math.sin(angle) * radius * 0.58
+      this.pixelRect(px, py, block * 1.25, block * 1.25, i % 2 === 0 ? '#FFFFFF' : '#F6C35B')
+    }
+    this.drawPixelStar(cx, cy - radius * 0.4, block * 2.2, '#F6C35B')
+    this.drawPixelStar(cx - radius * 0.48, cy + radius * 0.16, block * 1.5, '#35E982')
+    this.drawPixelStar(cx + radius * 0.48, cy + radius * 0.16, block * 1.5, '#A5F3FC')
     this.ctx.restore()
   }
 

@@ -34,6 +34,16 @@ import { cn } from '@/lib/utils'
 
 const WIPE_TASK_INTERVAL_MS = 12 * 60 * 60 * 1000
 
+const DAILY_CARE_TIPS = [
+  'Rotate pots a quarter turn so leaves grow evenly toward the light.',
+  'Check soil with one finger before watering; damp soil can wait.',
+  'Wipe broad leaves gently so they can breathe and catch more light.',
+  'Move stressed plants away from harsh midday sun for a calmer recovery.',
+  'Trim yellow leaves early so the plant spends energy on fresh growth.',
+  'Keep airflow soft and steady; crowded leaves invite pests and mildew.',
+  'Water slowly around the root zone instead of splashing the leaves.',
+]
+
 const MAP_POSITIONS = [
   { x: 27, y: 32 },
   { x: 62, y: 25 },
@@ -208,6 +218,12 @@ function getCareLabel(action: string) {
   }
 }
 
+function getDailyCareTip(timestamp = Date.now()) {
+  const key = new Date(timestamp)
+  const daySeed = Number(`${key.getFullYear()}${String(key.getMonth() + 1).padStart(2, '0')}${String(key.getDate()).padStart(2, '0')}`)
+  return DAILY_CARE_TIPS[daySeed % DAILY_CARE_TIPS.length]
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -327,6 +343,7 @@ export default function DashboardPage() {
   const urgentCount = plantStats.filter((stat) => stat.status === 'critical' || stat.status === 'diagnosis' || stat.status === 'wilted').length
   const gardenStability = plants.length > 0 ? Math.round((healthyCount / plants.length) * 100) : 0
   const mapRefreshLabel = userProfile?.lastMapRefresh ?? 'today'
+  const dailyCareTip = useMemo(() => getDailyCareTip(clock), [clock])
   const openNeighbor = (neighbor: FriendPlant) => {
     setSelectedNeighborId(neighbor.id)
   }
@@ -556,6 +573,14 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="mt-4 grid gap-2">
+                  <div className="care-tip-card">
+                    <Sparkles className="h-4 w-4 text-accent" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <div className="font-pixel text-[8px] text-primary">Daily tip</div>
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{dailyCareTip}</p>
+                    </div>
+                  </div>
+
                   {careTasks.length === 0 ? (
                     <div className="rounded-md border border-primary/15 bg-secondary/45 p-4">
                       <div className="flex items-center gap-2 font-pixel text-[9px] text-primary">

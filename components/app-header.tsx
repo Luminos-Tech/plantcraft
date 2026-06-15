@@ -5,11 +5,10 @@ import { getWaterCycleRemainingMs, useGameStore } from '@/lib/store'
 import { APP_VERSION } from '@/lib/version'
 
 export function AppHeader() {
-  const { coins, level, xp, plants, userProfile, getPlantHp } = useGameStore()
+  const { coins, level, xp, plants, getPlantHp } = useGameStore()
   const xpProgress = Math.max(0, Math.min(100, (xp / 100) * 100))
   const alertCount = plants.filter((plant) => getWaterCycleRemainingMs(plant) <= 0 || getPlantHp(plant.id) < 40 || plant.pendingDiagnosis).length
   const statusLabel = alertCount > 0 ? `${alertCount} alert${alertCount > 1 ? 's' : ''}` : 'Stable'
-  const avatarUrl = userProfile?.avatarUrl
 
   return (
     <header className="app-header sticky top-0 z-40 border-b border-primary/20 bg-card/88 px-3 py-2 shadow-sm backdrop-blur-xl sm:px-4">
@@ -18,11 +17,7 @@ export function AppHeader() {
           {/* Logo */}
           <div className="flex min-w-0 items-center gap-2.5">
             <div className="brand-mark flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border-2 border-primary bg-primary text-primary-foreground shadow-sm">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <Leaf className="h-4 w-4" aria-hidden="true" />
-              )}
+              <Leaf className="h-4 w-4" aria-hidden="true" />
             </div>
             <div className="min-w-0">
               <div className="flex min-w-0 items-center gap-1.5">
