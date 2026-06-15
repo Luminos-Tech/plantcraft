@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Inter, Press_Start_2P } from 'next/font/google'
 import Script from 'next/script'
 import { Analytics } from '@vercel/analytics/next'
+import { PWARegistration } from '@/components/pwa-registration'
 import { RewardToast } from '@/components/reward-toast'
 import './globals.css'
 
@@ -65,6 +66,23 @@ export const metadata: Metadata = {
   title: 'PlantCraft - Gamified Plant Care',
   description: 'Take care of your plants with AR and gamification. Earn coins, level up, and decorate your plants!',
   generator: 'v0.app',
+  manifest: '/manifest.webmanifest',
+  applicationName: 'PlantCraft',
+  appleWebApp: {
+    capable: true,
+    title: 'PlantCraft',
+    statusBarStyle: 'black-translucent',
+    startupImage: [],
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-title': 'PlantCraft',
+    'apple-mobile-web-app-status-bar-style': 'black-translucent',
+  },
   icons: {
     icon: [
       {
@@ -89,7 +107,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: '#5C8A3C',
+  viewportFit: 'cover',
+  themeColor: '#2F8F5B',
 }
 
 export default function RootLayout({
@@ -111,6 +130,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: extensionAttributeCleanupScript }}
         />
         {children}
+        <PWARegistration />
         <RewardToast />
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>

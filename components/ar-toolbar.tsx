@@ -246,10 +246,10 @@ export function ARToolbar({
 
             <Button
               onClick={onCapturePlantPhoto}
-              disabled={!onCapturePlantPhoto || isPlantPhotoSaving}
+              disabled={!onCapturePlantPhoto || isPlantPhotoSaving || !canUseAnchor}
               variant="outline"
               className="h-10 rounded-sm border-white/25 bg-white/10 font-pixel text-[8px] text-white hover:bg-white/20 disabled:opacity-40"
-              title="Update this plant photo from the AR camera"
+              title="Update this plant photo with visible AR effects"
             >
               {isPlantPhotoSaving ? <Spinner className="h-4 w-4" /> : <Camera className="h-4 w-4" />}
               Photo

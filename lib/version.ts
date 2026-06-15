@@ -2,10 +2,12 @@
  * App version — update this after each fix or feature change.
  * Format: major.minor.patch
  */
-export const APP_VERSION = '1.7.3'
+export const APP_VERSION = '1.7.4'
 
 /**
  * Changelog (latest first):
+ * 1.7.4 - Capture plant photos with the visible AR overlay and add iOS/PWA
+ *         install support for Safari Add to Home Screen
  * 1.7.3 - Restore the fixed PlantCraft leaf logo and make AR Photo update
  *         the current plant image immediately
  * 1.7.2 - Pin neighbor count to the map top-right on mobile and make AR

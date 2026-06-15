@@ -1,0 +1,33 @@
+{
+  "name": "PlantCraft",
+  "short_name": "PlantCraft",
+  "description": "Gamified plant care with AR decoration, scanning, and garden missions.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "fullscreen", "browser"],
+  "orientation": "portrait",
+  "background_color": "#F6FAF1",
+  "theme_color": "#2F8F5B",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-light-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["lifestyle", "productivity", "games"]
+}

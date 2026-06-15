@@ -9,7 +9,6 @@ import { ARToolbar } from '@/components/ar-toolbar'
 import { ScanResultModal } from '@/components/scan-result-modal'
 import { FilterEngine, type ARFrameState, type BBox } from '@/lib/filter/filter-engine'
 import { subscribeToPlant, type PublicPlantData } from '@/lib/firebase/plant-sync'
-import { captureVideoFrame } from '@/lib/ai/diagnose-plant'
 import { Button } from '@/components/ui/button'
 
 const DEFAULT_AR_STATE: ARFrameState = {
@@ -24,44 +23,60 @@ function getItemCategory(itemId: string) {
   return SHOP_ITEMS.find((item) => item.id === itemId)?.category ?? 'block'
 }
 
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => reject(new Error('Could not read captured plant photo.'))
-    reader.onload = () => {
-      const fallbackDataUrl = typeof reader.result === 'string' ? reader.result : ''
-      if (!fallbackDataUrl) {
-        reject(new Error('Captured plant photo was empty.'))
-        return
-      }
+function drawObjectCover(
+  ctx: CanvasRenderingContext2D,
+  source: CanvasImageSource,
+  sourceWidth: number,
+  sourceHeight: number,
+  targetWidth: number,
+  targetHeight: number
+) {
+  const scale = Math.max(targetWidth / sourceWidth, targetHeight / sourceHeight)
+  const drawWidth = sourceWidth * scale
+  const drawHeight = sourceHeight * scale
+  const offsetX = (targetWidth - drawWidth) / 2
+  const offsetY = (targetHeight - drawHeight) / 2
+  ctx.drawImage(source, offsetX, offsetY, drawWidth, drawHeight)
+}
 
-      const img = new Image()
-      img.onload = () => {
-        try {
-          const canvas = document.createElement('canvas')
-          const size = 256
-          canvas.width = size
-          canvas.height = size
-          const ctx = canvas.getContext('2d')
-          if (!ctx) {
-            resolve(fallbackDataUrl)
-            return
-          }
+function captureCompositePlantPhoto(
+  video: HTMLVideoElement,
+  overlay: HTMLCanvasElement,
+  outputSize = 256
+) {
+  const previewRect = video.getBoundingClientRect()
+  const width = Math.max(1, Math.round(previewRect.width || window.innerWidth))
+  const height = Math.max(1, Math.round(previewRect.height || window.innerHeight))
 
-          const cropSize = Math.min(img.width, img.height)
-          const cropX = (img.width - cropSize) / 2
-          const cropY = (img.height - cropSize) / 2
-          ctx.drawImage(img, cropX, cropY, cropSize, cropSize, 0, 0, size, size)
-          resolve(canvas.toDataURL('image/jpeg', 0.8))
-        } catch {
-          resolve(fallbackDataUrl)
-        }
-      }
-      img.onerror = () => resolve(fallbackDataUrl)
-      img.src = fallbackDataUrl
-    }
-    reader.readAsDataURL(blob)
-  })
+  const stage = document.createElement('canvas')
+  stage.width = width
+  stage.height = height
+  const stageCtx = stage.getContext('2d')
+  if (!stageCtx) throw new Error('Could not prepare AR photo.')
+
+  stageCtx.imageSmoothingEnabled = true
+  drawObjectCover(
+    stageCtx,
+    video,
+    video.videoWidth || width,
+    video.videoHeight || height,
+    width,
+    height
+  )
+  stageCtx.drawImage(overlay, 0, 0, overlay.width, overlay.height, 0, 0, width, height)
+
+  const cropSize = Math.min(width, height)
+  const cropX = (width - cropSize) / 2
+  const cropY = (height - cropSize) / 2
+  const output = document.createElement('canvas')
+  output.width = outputSize
+  output.height = outputSize
+  const outputCtx = output.getContext('2d')
+  if (!outputCtx) throw new Error('Could not render AR photo.')
+
+  outputCtx.imageSmoothingEnabled = true
+  outputCtx.drawImage(stage, cropX, cropY, cropSize, cropSize, 0, 0, outputSize, outputSize)
+  return output.toDataURL('image/jpeg', 0.82)
 }
 
 function CameraContent() {
@@ -296,8 +311,15 @@ function CameraContent() {
 
   const handleCapturePlantPhoto = useCallback(async () => {
     const video = videoRef.current
+    const overlay = canvasRef.current
     if (!video || video.readyState < 2) {
       setPlantPhotoStatus('Camera frame is not ready.')
+      window.setTimeout(() => setPlantPhotoStatus(null), 2400)
+      return
+    }
+
+    if (!overlay) {
+      setPlantPhotoStatus('AR layer is not ready.')
       window.setTimeout(() => setPlantPhotoStatus(null), 2400)
       return
     }
@@ -312,10 +334,9 @@ function CameraContent() {
     setPlantPhotoStatus(null)
 
     try {
-      const blob = await captureVideoFrame(video, { maxSize: 384, quality: 0.76 })
-      const imageUrl = await blobToDataUrl(blob)
+      const imageUrl = captureCompositePlantPhoto(video, overlay)
       updatePlant(plantId, { imageUrl })
-      setPlantPhotoStatus('Plant photo updated.')
+      setPlantPhotoStatus('Plant photo updated with AR.')
     } catch {
       setPlantPhotoStatus('Plant photo failed.')
     } finally {
