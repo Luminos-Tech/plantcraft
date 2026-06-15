@@ -3,7 +3,15 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, CheckCircle2, Droplets, Leaf, MoreVertical, Pencil, Send, Skull, Sparkles, Trash2 } from 'lucide-react'
-import { CARE_ACTION_COOLDOWN_MS, Plant, useGameStore } from '@/lib/store'
+import {
+  CARE_ACTION_COOLDOWN_MS,
+  Plant,
+  formatWaterCycleRemaining,
+  getPlantGroupConfig,
+  getWaterCycleProgress,
+  getWaterCycleRemainingMs,
+  useGameStore,
+} from '@/lib/store'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -40,10 +48,13 @@ export function PlantCard({ plant, compact = false, selected = false, className,
   const [deleteOpen, setDeleteOpen] = useState(false)
   const { getPlantHp, waterPlant, wipePlant, removePlant } = useGameStore()
   const hp = getPlantHp(plant.id)
-  const lastWatered = plant.lastWatered || plant.createdAt || now
   const lastWipedAt = plant.lastWipedAt || plant.createdAt || 0
-  const waterReady = hp < 100 && now - lastWatered >= CARE_ACTION_COOLDOWN_MS
+  const waterRemaining = getWaterCycleRemainingMs(plant, now)
+  const waterProgress = getWaterCycleProgress(plant, now)
+  const waterReady = waterRemaining <= 0
   const wipeReady = now - lastWipedAt >= WIPE_ACTION_COOLDOWN_MS
+  const isWilted = waterRemaining <= 0
+  const groupConfig = getPlantGroupConfig(plant.plantGroup)
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 30000)
@@ -63,6 +74,7 @@ export function PlantCard({ plant, compact = false, selected = false, className,
   }
 
   const getStatus = () => {
+    if (isWilted) return { text: 'Wilted', icon: <Droplets className="h-2.5 w-2.5" />, className: 'bg-destructive text-destructive-foreground' }
     if (hp === 0) return { text: 'Need Help!', icon: <Skull className="h-2.5 w-2.5" />, className: 'bg-destructive text-destructive-foreground' }
     if (hp < 20) return { text: 'Critical!', icon: <AlertTriangle className="h-2.5 w-2.5" />, className: 'bg-destructive text-destructive-foreground' }
     if (hp < 50) return { text: 'Thirsty', icon: <Droplets className="h-2.5 w-2.5" />, className: 'bg-[#FFC107] text-foreground' }
@@ -79,7 +91,7 @@ export function PlantCard({ plant, compact = false, selected = false, className,
         !compact && 'sm:p-4',
         hasDiagnosis ? 'border-destructive' : 'border-primary/60 hover:border-primary',
         selected && 'ring-2 ring-primary/45 ring-offset-2 ring-offset-background',
-        hp === 0 && 'animate-pulse opacity-85',
+        (hp === 0 || isWilted) && 'plant-wilt opacity-90',
         onSelect && 'cursor-pointer',
         className
       )}
@@ -190,6 +202,26 @@ export function PlantCard({ plant, compact = false, selected = false, className,
                     hp < 20 && 'animate-pulse-red'
                   )}
                   style={{ width: `${hp}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="mt-2">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <span className="truncate font-pixel text-[8px] text-muted-foreground">
+                  Water • {groupConfig.label}
+                </span>
+                <span className={cn('shrink-0 font-pixel text-[7px]', isWilted ? 'text-destructive' : 'text-primary')}>
+                  {formatWaterCycleRemaining(waterRemaining)}
+                </span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-muted ring-1 ring-border/70">
+                <div
+                  className={cn(
+                    'h-full rounded-full transition-all duration-500',
+                    isWilted ? 'bg-destructive animate-pulse-red' : 'bg-primary'
+                  )}
+                  style={{ width: `${waterProgress}%` }}
                 />
               </div>
             </div>

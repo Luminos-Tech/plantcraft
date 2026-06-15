@@ -283,7 +283,7 @@ export class FilterEngine {
     this.ctx.shadowBlur = category === 'vfx' ? 18 : 10
 
     if (category === 'vfx') {
-      this.drawVfx(anchor, item.itemId, size)
+      this.drawVfx(anchor, item.itemId, size, bh * (placement.anchorY - 0.5))
     } else if (item.itemId === 'hat-crown') {
       this.drawCrown(centerX, centerY, size)
     } else if (item.itemId === 'hat-straw' || category === 'hat') {
@@ -410,15 +410,15 @@ export class FilterEngine {
     this.pixelRect(x + p * 5, y + p * 5, p * 2, p * 2, '#FFFFFF')
   }
 
-  private drawVfx(anchor: BBox, itemId: string, size: number): void {
+  private drawVfx(anchor: BBox, itemId: string, size: number, offsetY: number): void {
     if (itemId === 'vfx-rainbow') {
-      this.drawRainbowAura(anchor, size)
+      this.drawRainbowAura(anchor, size, offsetY)
       return
     }
-    this.drawSparkles(anchor, size)
+    this.drawSparkles(anchor, size, offsetY)
   }
 
-  private drawSparkles([x, y, w, h]: BBox, size: number): void {
+  private drawSparkles([x, y, w, h]: BBox, size: number, offsetY: number): void {
     const points = [
       [0.22, 0.12, 1],
       [0.72, 0.18, 0.75],
@@ -430,12 +430,12 @@ export class FilterEngine {
     this.ctx.save()
     this.ctx.globalAlpha = 0.9
     for (const [px, py, scale] of points) {
-      this.drawPixelStar(x + w * px, y + h * py, size * 0.09 * scale, '#F9E66B')
+      this.drawPixelStar(x + w * px, y + h * py + offsetY, size * 0.09 * scale, '#F9E66B')
     }
     this.ctx.restore()
   }
 
-  private drawRainbowAura([x, y, w, h]: BBox, size: number): void {
+  private drawRainbowAura([x, y, w, h]: BBox, size: number, offsetY: number): void {
     this.ctx.save()
     this.ctx.globalAlpha = 0.74
     const colors = ['#E84A5F', '#F9A03F', '#F9E66B', '#4CAF50', '#4DD0E1', '#A855F7']
@@ -444,7 +444,7 @@ export class FilterEngine {
       const inset = index * block * 1.7
       const left = x + w * 0.12 + inset
       const right = x + w * 0.88 - inset
-      const top = y + h * 0.08 + index * block * 1.3
+      const top = y + offsetY + h * 0.08 + index * block * 1.3
       const steps = 18 - index
 
       for (let step = 0; step <= steps; step += 1) {

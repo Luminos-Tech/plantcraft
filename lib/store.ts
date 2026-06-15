@@ -5,6 +5,21 @@ import { persist } from 'zustand/middleware'
 
 export type ItemCategory = 'hat' | 'glasses' | 'block' | 'vfx'
 export type DecorationSlot = 'top' | 'face' | 'base' | 'aura'
+export type PlantGroup = 'default' | 'succulent' | 'tropical' | 'herb' | 'flowering'
+
+export interface PlantGroupConfig {
+  id: PlantGroup
+  label: string
+  description: string
+  waterCycleMs: number
+}
+
+export interface UserProfile {
+  avatarUrl: string
+  dailyNeighbors: FriendPlant[]
+  lastMapRefresh: string | null
+  updatedAt: number
+}
 
 export interface PlacedItem {
   id: string
@@ -29,7 +44,7 @@ const SLOT_DECORATION_PLACEMENT: Record<DecorationSlot, DecorationPlacement> = {
   top: { placementSlot: 'top', anchorX: 0.5, anchorY: -0.18, scaleRatio: 0.44 },
   face: { placementSlot: 'face', anchorX: 0.5, anchorY: 0.28, scaleRatio: 0.4 },
   base: { placementSlot: 'base', anchorX: 0.78, anchorY: 0.82, scaleRatio: 0.3 },
-  aura: { placementSlot: 'aura', anchorX: 0.5, anchorY: 0.5, scaleRatio: 0.92 },
+  aura: { placementSlot: 'aura', anchorX: 0.5, anchorY: 0.58, scaleRatio: 0.92 },
 }
 
 const CATEGORY_DECORATION_SLOT: Record<ItemCategory, DecorationSlot> = {
@@ -46,8 +61,8 @@ const ITEM_DECORATION_OVERRIDES: Record<string, Partial<DecorationPlacement>> = 
   'glasses-cool': { anchorY: 0.28, scaleRatio: 0.4 },
   'block-diamond': { anchorX: 0.82, anchorY: 0.78, scaleRatio: 0.28 },
   'block-dirt': { anchorX: 0.78, anchorY: 0.84, scaleRatio: 0.32 },
-  'vfx-rainbow': { anchorY: 0.46, scaleRatio: 0.98 },
-  'vfx-sparkle': { anchorY: 0.48, scaleRatio: 0.86 },
+  'vfx-rainbow': { anchorY: 0.58, scaleRatio: 0.98 },
+  'vfx-sparkle': { anchorY: 0.6, scaleRatio: 0.86 },
 }
 
 function isDecorationSlot(value: unknown): value is DecorationSlot {
@@ -84,6 +99,8 @@ export interface Plant {
   name: string
   description: string
   imageUrl: string
+  plantGroup: PlantGroup
+  waterCycle: number
   lastWatered: number      // timestamp ms
   lastWipedAt: number      // timestamp ms
   createdAt: number        // timestamp ms
@@ -132,6 +149,10 @@ export interface FriendPlant {
   plantId: string          // original plant id on friend's account
   name: string
   description: string
+  imageUrl?: string
+  plantGroup?: PlantGroup
+  waterCycle?: number
+  lastWatered?: number
   hp: number
   placedItems: Pick<PlacedItem, 'id' | 'itemId' | 'placementSlot' | 'anchorX' | 'anchorY' | 'scaleRatio'>[]
   lastUpdated: number
@@ -167,6 +188,87 @@ const REWARD_TABLE = {
   purchase:     { xp: 15,  coins: 0   },
 } as const
 
+export const DEFAULT_WATER_CYCLE_MS = 3 * 24 * 60 * 60 * 1000
+
+export const PLANT_GROUPS: PlantGroupConfig[] = [
+  {
+    id: 'default',
+    label: 'Phổ thông',
+    description: 'Chu kỳ cân bằng cho cây mới.',
+    waterCycleMs: DEFAULT_WATER_CYCLE_MS,
+  },
+  {
+    id: 'succulent',
+    label: 'Mọng nước',
+    description: 'Ít tưới hơn, chịu khô tốt.',
+    waterCycleMs: 7 * 24 * 60 * 60 * 1000,
+  },
+  {
+    id: 'tropical',
+    label: 'Nhiệt đới',
+    description: 'Ưa ẩm, cần chăm đều tay.',
+    waterCycleMs: 2 * 24 * 60 * 60 * 1000,
+  },
+  {
+    id: 'herb',
+    label: 'Rau thơm',
+    description: 'Tưới thường xuyên để tươi lâu.',
+    waterCycleMs: 24 * 60 * 60 * 1000,
+  },
+  {
+    id: 'flowering',
+    label: 'Ra hoa',
+    description: 'Cần nhịp tưới ổn định để giữ nụ.',
+    waterCycleMs: 3 * 24 * 60 * 60 * 1000,
+  },
+]
+
+export function getPlantGroupConfig(plantGroup?: PlantGroup | null) {
+  return PLANT_GROUPS.find((group) => group.id === plantGroup) ?? PLANT_GROUPS[0]
+}
+
+export function getPlantWaterCycleMs(plant: Pick<Plant, 'plantGroup' | 'waterCycle'>) {
+  return Number.isFinite(plant.waterCycle) && plant.waterCycle > 0
+    ? plant.waterCycle
+    : getPlantGroupConfig(plant.plantGroup).waterCycleMs
+}
+
+export function getWaterCycleRemainingMs(
+  plant: Pick<Plant, 'lastWatered' | 'createdAt' | 'plantGroup' | 'waterCycle'>,
+  now = Date.now()
+) {
+  const cycleMs = Math.max(1, getPlantWaterCycleMs(plant))
+  const lastWatered = getStableTimestamp(plant.lastWatered, plant.createdAt || now)
+  return lastWatered + cycleMs - now
+}
+
+export function getWaterCycleProgress(plant: Pick<Plant, 'lastWatered' | 'createdAt' | 'plantGroup' | 'waterCycle'>, now = Date.now()) {
+  const cycleMs = Math.max(1, getPlantWaterCycleMs(plant))
+  const remaining = getWaterCycleRemainingMs(plant, now)
+  return Math.max(0, Math.min(100, Math.round((remaining / cycleMs) * 100)))
+}
+
+export function formatWaterCycleRemaining(ms: number) {
+  if (ms <= 0) return 'Water now'
+
+  const totalMinutes = Math.ceil(ms / 60000)
+  const days = Math.floor(totalMinutes / (60 * 24))
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60)
+  const minutes = totalMinutes % 60
+
+  if (days > 0) return `${days}d ${hours}h`
+  if (hours > 0) return `${hours}h ${minutes}m`
+  return `${minutes}m`
+}
+
+export function getDayKey(timestamp = Date.now()) {
+  const date = new Date(timestamp)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 // ===== STORE INTERFACE =====
 
 interface GameState {
@@ -187,10 +289,13 @@ interface GameState {
   // Reward History
   rewardHistory: RewardLog[]
   missionClaims: MissionClaim[]
+
+  // User Profile
+  userProfile: UserProfile
   
   // Actions
-  addPlant: (name: string, imageUrl: string, description?: string) => void
-  updatePlant: (plantId: string, data: Partial<Pick<Plant, 'name' | 'description' | 'imageUrl'>>) => void
+  addPlant: (name: string, imageUrl: string, description?: string, plantGroup?: PlantGroup) => void
+  updatePlant: (plantId: string, data: Partial<Pick<Plant, 'name' | 'description' | 'imageUrl' | 'plantGroup' | 'waterCycle'>>) => void
   removePlant: (plantId: string) => void
   waterPlant: (plantId: string) => boolean
   wipePlant: (plantId: string) => boolean
@@ -216,9 +321,15 @@ interface GameState {
   
   // Friend Plants
   friendPlants: FriendPlant[]
-  addFriendPlant: (ownerUid: string, plantId: string, data: { name: string; description?: string; hp: number; placedItems: FriendPlant['placedItems']; lastUpdated: number }) => void
+  addFriendPlant: (ownerUid: string, plantId: string, data: { name: string; description?: string; imageUrl?: string; plantGroup?: PlantGroup; waterCycle?: number; lastWatered?: number; hp: number; placedItems: FriendPlant['placedItems']; lastUpdated: number }) => void
   removeFriendPlant: (id: string) => void
-  updateFriendPlant: (id: string, data: Partial<Pick<FriendPlant, 'name' | 'description' | 'hp' | 'placedItems' | 'lastUpdated'>>) => void
+  updateFriendPlant: (id: string, data: Partial<Pick<FriendPlant, 'name' | 'description' | 'imageUrl' | 'plantGroup' | 'waterCycle' | 'lastWatered' | 'hp' | 'placedItems' | 'lastUpdated'>>) => void
+
+  // User Sync
+  refreshDailyNeighbors: () => Promise<void>
+  updateUserAvatar: (avatarUrl: string) => void
+  updateAvatarFromBlob: (blob: Blob) => Promise<boolean>
+  syncAvatarFromBlob: (blob: Blob) => Promise<boolean>
   
   // Utility
   getPlantHp: (plantId: string) => number
@@ -226,9 +337,103 @@ interface GameState {
 
 const XP_PER_LEVEL = 100
 export const CARE_ACTION_COOLDOWN_MS = 5 * 60 * 1000
+const DAILY_NEIGHBOR_LIMIT = 6
+const ENGLISH_FIRST_NAMES = [
+  'Oliver',
+  'Amelia',
+  'Noah',
+  'Mia',
+  'Leo',
+  'Ava',
+  'Theo',
+  'Luna',
+  'Ethan',
+  'Ivy',
+  'Mason',
+  'Sophie',
+]
+const ENGLISH_LAST_NAMES = [
+  'Green',
+  'Fields',
+  'Brook',
+  'Stone',
+  'Woods',
+  'River',
+  'Bloom',
+  'Reed',
+  'Hayes',
+  'Parker',
+  'Bennett',
+  'Morgan',
+]
 
 function getStableTimestamp(value: number | undefined, fallback: number) {
   return Number.isFinite(value) && value ? value : fallback
+}
+
+function seededIndex(seed: string, length: number, salt = 0) {
+  let hash = 2166136261 + salt
+  for (let i = 0; i < seed.length; i += 1) {
+    hash ^= seed.charCodeAt(i)
+    hash = Math.imul(hash, 16777619)
+  }
+  return Math.abs(hash) % length
+}
+
+export function getFriendOwnerName(ownerUid?: string | null) {
+  const seed = ownerUid || 'plantcraft-neighbor'
+  const first = ENGLISH_FIRST_NAMES[seededIndex(seed, ENGLISH_FIRST_NAMES.length)]
+  const last = ENGLISH_LAST_NAMES[seededIndex(seed, ENGLISH_LAST_NAMES.length, 97)]
+  return `${first} ${last}`
+}
+
+function getDefaultUserProfile(): UserProfile {
+  return {
+    avatarUrl: '',
+    dailyNeighbors: [],
+    lastMapRefresh: null,
+    updatedAt: 0,
+  }
+}
+
+function getPlantWaterSettings(plantGroup?: PlantGroup | null) {
+  const group = getPlantGroupConfig(plantGroup)
+  return {
+    plantGroup: group.id,
+    waterCycle: group.waterCycleMs,
+  }
+}
+
+function blobToAvatarDataUrl(blob: Blob): Promise<string> {
+  if (typeof window === 'undefined') return Promise.resolve('')
+
+  return new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onerror = () => resolve('')
+    reader.onload = () => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        const size = 160
+        canvas.width = size
+        canvas.height = size
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          resolve('')
+          return
+        }
+
+        const cropSize = Math.min(img.width, img.height)
+        const cropX = (img.width - cropSize) / 2
+        const cropY = (img.height - cropSize) / 2
+        ctx.drawImage(img, cropX, cropY, cropSize, cropSize, 0, 0, size, size)
+        resolve(canvas.toDataURL('image/jpeg', 0.78))
+      }
+      img.onerror = () => resolve('')
+      img.src = String(reader.result ?? '')
+    }
+    reader.readAsDataURL(blob)
+  })
 }
 
 function applyXpProgress(level: number, xp: number, xpDelta: number) {
@@ -253,18 +458,7 @@ function applyXpProgress(level: number, xp: number, xpDelta: number) {
   }
 }
 
-function syncPublicPlantHp(plantId: string, hp: number) {
-  if (typeof window === 'undefined') return
-
-  const ownerUid = localStorage.getItem('plantcraft_uid')
-  if (!ownerUid) return
-
-  import('@/lib/firebase/plant-sync').then(({ syncHPToFirebase }) => {
-    syncHPToFirebase(plantId, ownerUid, hp).catch(console.warn)
-  })
-}
-
-function getOrCreateOwnerUid() {
+export function getOrCreateOwnerUid() {
   if (typeof window === 'undefined') return null
 
   let uid = localStorage.getItem('plantcraft_uid')
@@ -273,6 +467,15 @@ function getOrCreateOwnerUid() {
     localStorage.setItem('plantcraft_uid', uid)
   }
   return uid
+}
+
+function syncUserProfileRecord(profile: UserProfile) {
+  const ownerUid = getOrCreateOwnerUid()
+  if (!ownerUid) return
+
+  import('@/lib/firebase/user-sync').then(({ publishUserProfileToFirebase }) => {
+    publishUserProfileToFirebase(ownerUid, profile).catch(console.warn)
+  })
 }
 
 function syncOwnedPlantRecord(plant: Plant, hp: number) {
@@ -336,16 +539,19 @@ export const useGameStore = create<GameState>()(
       rewardHistory: [],
       missionClaims: [],
       friendPlants: [],
+      userProfile: getDefaultUserProfile(),
       
       // ── Plant Actions ──
 
-      addPlant: (name, imageUrl, description = '') => {
+      addPlant: (name, imageUrl, description = '', plantGroup = 'default') => {
         const now = Date.now()
+        const waterSettings = getPlantWaterSettings(plantGroup)
         const newPlant: Plant = {
           id: crypto.randomUUID(),
           name: name.slice(0, 20),
           description: description.slice(0, 160),
           imageUrl,
+          ...waterSettings,
           lastWatered: now,
           lastWipedAt: now,
           createdAt: now,
@@ -384,12 +590,19 @@ export const useGameStore = create<GameState>()(
         set((state) => ({
           plants: state.plants.map((plant) => {
             if (plant.id !== plantId) return plant
+            const waterSettings = data.plantGroup !== undefined
+              ? getPlantWaterSettings(data.plantGroup)
+              : {
+                  plantGroup: plant.plantGroup ?? 'default',
+                  waterCycle: data.waterCycle !== undefined ? data.waterCycle : getPlantWaterCycleMs(plant),
+                }
 
             return {
               ...plant,
               name: data.name !== undefined ? data.name.slice(0, 20) : plant.name,
               description: data.description !== undefined ? data.description.slice(0, 160) : plant.description,
               imageUrl: data.imageUrl !== undefined ? data.imageUrl : plant.imageUrl,
+              ...waterSettings,
             }
           }),
         }))
@@ -413,8 +626,9 @@ export const useGameStore = create<GameState>()(
         if (!plant) return false
 
         const lastWatered = getStableTimestamp(plant.lastWatered, plant.createdAt || now)
+        const waterDue = getWaterCycleRemainingMs(plant, now) <= 0
         const hp = get().getPlantHp(plantId)
-        if (now - lastWatered < CARE_ACTION_COOLDOWN_MS || hp >= 100) return false
+        if (!waterDue && (now - lastWatered < CARE_ACTION_COOLDOWN_MS || hp >= 100)) return false
 
         const rewards = REWARD_TABLE.water
         set((state) => {
@@ -442,7 +656,7 @@ export const useGameStore = create<GameState>()(
         const updatedPlant = get().plants.find((p) => p.id === plantId)
         const updatedHp = get().getPlantHp(plantId)
         if (updatedPlant) syncOwnedPlantRecord(updatedPlant, updatedHp)
-        if (plant.isPublic) syncPublicPlantHp(plantId, updatedHp)
+        if (updatedPlant?.isPublic) syncPublicPlantRecord(updatedPlant, updatedHp)
         dispatchRewardEvent(rewards.xp, rewards.coins, 'Watering')
         return true
       },
@@ -515,7 +729,7 @@ export const useGameStore = create<GameState>()(
         const updatedPlant = get().plants.find((p) => p.id === plantId)
         const updatedHp = get().getPlantHp(plantId)
         if (updatedPlant) syncOwnedPlantRecord(updatedPlant, updatedHp)
-        if (plant.isPublic) syncPublicPlantHp(plantId, updatedHp)
+        if (updatedPlant?.isPublic) syncPublicPlantRecord(updatedPlant, updatedHp)
         dispatchRewardEvent(rewards.xp, rewards.coins, 'Cured disease')
         return true
       },
@@ -533,7 +747,7 @@ export const useGameStore = create<GameState>()(
         const updatedPlant = get().plants.find((p) => p.id === plantId)
         const updatedHp = get().getPlantHp(plantId)
         if (updatedPlant) syncOwnedPlantRecord(updatedPlant, updatedHp)
-        if (plant.isPublic) syncPublicPlantHp(plantId, updatedHp)
+        if (updatedPlant?.isPublic) syncPublicPlantRecord(updatedPlant, updatedHp)
         return true
       },
 
@@ -775,10 +989,12 @@ export const useGameStore = create<GameState>()(
         if (!plant) return 0
         
         const now = Date.now()
-        const lastWatered = getStableTimestamp(plant.lastWatered, plant.createdAt || now)
-        // HP decays 4 points per hour (~25 hours to death)
-        const hoursSinceWatered = (now - lastWatered) / 3600000
-        const hp = Math.max(0, Math.min(100, 100 - Math.floor(hoursSinceWatered * 4)))
+        const remaining = getWaterCycleRemainingMs(plant, now)
+        if (remaining > 0) return 100
+
+        // Once the custom water cycle expires, the plant wilts and loses HP.
+        const overdueHours = Math.abs(remaining) / 3600000
+        const hp = Math.max(0, Math.min(100, 100 - Math.floor(overdueHours * 6)))
         return hp
       },
 
@@ -820,9 +1036,169 @@ export const useGameStore = create<GameState>()(
           ),
         }))
       },
+
+      // ── User Sync ──
+
+      refreshDailyNeighbors: async () => {
+        const todayKey = getDayKey()
+        const currentProfile = get().userProfile ?? getDefaultUserProfile()
+        const cachedNeighbors = currentProfile.dailyNeighbors ?? []
+        const cacheHasMissingImages = cachedNeighbors.some((neighbor) => !neighbor.imageUrl)
+        if (currentProfile.lastMapRefresh === todayKey && !cacheHasMissingImages) {
+          return
+        }
+
+        const ownerUid = getOrCreateOwnerUid()
+        const fallbackNeighbors = get().friendPlants.slice(0, DAILY_NEIGHBOR_LIMIT)
+        let nextNeighbors = fallbackNeighbors
+
+        if (ownerUid) {
+          try {
+            const { fetchRandomPublicPlants } = await import('@/lib/firebase/plant-sync')
+            const publicNeighbors = await fetchRandomPublicPlants(DAILY_NEIGHBOR_LIMIT, ownerUid)
+            if (publicNeighbors.length > 0) {
+              nextNeighbors = publicNeighbors.map((neighbor) => ({
+                id: `${neighbor.ownerUid}_${neighbor.plantId}`,
+                ownerUid: neighbor.ownerUid,
+                plantId: neighbor.plantId,
+                name: neighbor.name,
+                description: neighbor.description ?? '',
+                imageUrl: neighbor.imageUrl,
+                plantGroup: neighbor.plantGroup,
+                waterCycle: neighbor.waterCycle,
+                lastWatered: neighbor.lastWatered,
+                hp: neighbor.hp,
+                placedItems: neighbor.placedItems ?? [],
+                lastUpdated: neighbor.lastUpdated,
+                addedAt: Date.now(),
+              }))
+            }
+          } catch (error) {
+            console.warn('Daily neighbor refresh failed', error)
+          }
+        }
+
+        const profile: UserProfile = {
+          ...getDefaultUserProfile(),
+          ...currentProfile,
+          dailyNeighbors: nextNeighbors,
+          lastMapRefresh: todayKey,
+          updatedAt: Date.now(),
+        }
+
+        set({ userProfile: profile })
+        syncUserProfileRecord(profile)
+      },
+
+      updateUserAvatar: (avatarUrl) => {
+        const currentProfile = get().userProfile ?? getDefaultUserProfile()
+        const profile: UserProfile = {
+          ...getDefaultUserProfile(),
+          ...currentProfile,
+          avatarUrl,
+          updatedAt: Date.now(),
+        }
+
+        set({ userProfile: profile })
+
+        const ownerUid = getOrCreateOwnerUid()
+        if (!ownerUid) return
+
+        import('@/lib/firebase/user-sync').then(({ updateUserAvatarInFirebase }) => {
+          updateUserAvatarInFirebase(ownerUid, avatarUrl).catch(console.warn)
+        })
+      },
+
+      updateAvatarFromBlob: async (blob) => {
+        try {
+          const localPreviewUrl = await blobToAvatarDataUrl(blob)
+          if (!localPreviewUrl) return false
+
+          const currentProfile = get().userProfile ?? getDefaultUserProfile()
+          set({
+            userProfile: {
+              ...getDefaultUserProfile(),
+              ...currentProfile,
+              avatarUrl: localPreviewUrl,
+              updatedAt: Date.now(),
+            },
+          })
+          return true
+        } catch (error) {
+          console.warn('Avatar preview failed', error)
+          return false
+        }
+      },
+
+      syncAvatarFromBlob: async (blob) => {
+        const ownerUid = getOrCreateOwnerUid()
+        if (!ownerUid) return false
+
+        try {
+          const { uploadUserAvatarToFirebase } = await import('@/lib/firebase/user-sync')
+          const avatarUrl = await uploadUserAvatarToFirebase(ownerUid, blob)
+          if (!avatarUrl) {
+            return false
+          }
+
+          get().updateUserAvatar(avatarUrl)
+          return true
+        } catch (error) {
+          console.warn('Avatar sync failed', error)
+          return false
+        }
+      },
     }),
     {
       name: 'plantcraft-storage',
+      version: 2,
+      migrate: (persistedState) => {
+        const state = persistedState as Partial<GameState> | undefined
+        if (!state) {
+          return {
+            coins: 100,
+            level: 1,
+            xp: 0,
+            plants: [],
+            ownedItems: [],
+            careLogs: [],
+            rewardHistory: [],
+            missionClaims: [],
+            friendPlants: [],
+            userProfile: getDefaultUserProfile(),
+          }
+        }
+
+        const plants = (state.plants ?? []).map((plant) => {
+          const plantGroup = plant.plantGroup ?? 'default'
+          const waterCycle = Number.isFinite(plant.waterCycle) && plant.waterCycle > 0
+            ? plant.waterCycle
+            : getPlantGroupConfig(plantGroup).waterCycleMs
+
+          return {
+            ...plant,
+            plantGroup,
+            waterCycle,
+          }
+        })
+
+        return {
+          coins: state.coins ?? 100,
+          level: state.level ?? 1,
+          xp: state.xp ?? 0,
+          plants,
+          ownedItems: state.ownedItems ?? [],
+          careLogs: state.careLogs ?? [],
+          rewardHistory: state.rewardHistory ?? [],
+          missionClaims: state.missionClaims ?? [],
+          friendPlants: state.friendPlants ?? [],
+          userProfile: {
+            ...getDefaultUserProfile(),
+            ...(state.userProfile ?? {}),
+            dailyNeighbors: state.userProfile?.dailyNeighbors ?? [],
+          },
+        }
+      },
       partialize: (state) => ({
         coins: state.coins,
         level: state.level,
@@ -833,6 +1209,7 @@ export const useGameStore = create<GameState>()(
         rewardHistory: state.rewardHistory,
         missionClaims: state.missionClaims,
         friendPlants: state.friendPlants,
+        userProfile: state.userProfile,
       }),
     }
   )

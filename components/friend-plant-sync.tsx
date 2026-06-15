@@ -37,6 +37,10 @@ export function FriendPlantSync() {
         updateFriendPlant(friend.id, {
           name: data.name,
           description: data.description,
+          imageUrl: data.imageUrl,
+          plantGroup: data.plantGroup,
+          waterCycle: data.waterCycle,
+          lastWatered: data.lastWatered,
           hp: data.hp,
           placedItems: data.placedItems ?? [],
           lastUpdated: data.lastUpdated,

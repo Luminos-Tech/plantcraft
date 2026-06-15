@@ -8,6 +8,7 @@ import {
   ScanLine,
   Sparkles,
   Trash2,
+  UserRound,
 } from 'lucide-react'
 import { ShopItem, SHOP_ITEMS, useGameStore, DiagnosisResult } from '@/lib/store'
 import { Button } from '@/components/ui/button'
@@ -26,6 +27,9 @@ interface ARToolbarProps {
   onDeleteModeChange: (mode: boolean) => void
   arState: ARFrameState
   onPlaceSelected: () => void
+  onCaptureAvatar?: () => void
+  isAvatarUploading?: boolean
+  avatarStatus?: string | null
 }
 
 export function ARToolbar({
@@ -38,6 +42,9 @@ export function ARToolbar({
   onDeleteModeChange,
   arState,
   onPlaceSelected,
+  onCaptureAvatar,
+  isAvatarUploading = false,
+  avatarStatus,
 }: ARToolbarProps) {
   const [isScanning, setIsScanning] = useState(false)
   const [scanError, setScanError] = useState<string | null>(null)
@@ -204,7 +211,7 @@ export function ARToolbar({
             )}
           </div>
 
-          <div className="mb-2 grid grid-cols-[44px_1fr_1fr] gap-2">
+          <div className="mb-2 grid grid-cols-[44px_1fr_1fr_1fr] gap-2">
             <IconButton
               label="Delete placed items"
               active={deleteMode}
@@ -236,6 +243,17 @@ export function ARToolbar({
               {isScanning ? <Spinner className="h-4 w-4" /> : <ScanLine className="h-4 w-4" />}
               Scan
             </Button>
+
+            <Button
+              onClick={onCaptureAvatar}
+              disabled={!onCaptureAvatar || isAvatarUploading}
+              variant="outline"
+              className="h-10 rounded-sm border-white/25 bg-white/10 font-pixel text-[8px] text-white hover:bg-white/20 disabled:opacity-40"
+              title="Capture current AR camera frame as your avatar"
+            >
+              {isAvatarUploading ? <Spinner className="h-4 w-4" /> : <UserRound className="h-4 w-4" />}
+              Avatar
+            </Button>
           </div>
 
           <Button
@@ -251,6 +269,11 @@ export function ARToolbar({
           {scanError && (
             <p className="mt-2 text-center font-pixel text-[8px] text-red-300">
               {scanError}
+            </p>
+          )}
+          {avatarStatus && (
+            <p className="mt-2 text-center font-pixel text-[8px] text-emerald-200">
+              {avatarStatus}
             </p>
           )}
         </div>

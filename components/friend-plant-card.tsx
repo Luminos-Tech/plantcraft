@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { AlertOctagon, AlertTriangle, CheckCircle2, Paintbrush, Sparkles, Trash2, Users } from 'lucide-react'
-import { FriendPlant, useGameStore } from '@/lib/store'
+import { FriendPlant, getFriendOwnerName, useGameStore } from '@/lib/store'
 
 interface FriendPlantCardProps {
   friend: FriendPlant
@@ -10,6 +10,7 @@ interface FriendPlantCardProps {
 
 export function FriendPlantCard({ friend }: FriendPlantCardProps) {
   const { removeFriendPlant } = useGameStore()
+  const ownerName = getFriendOwnerName(friend.ownerUid)
 
   const getHpColor = (hp: number) => {
     if (hp >= 70) return '#4CAF50'
@@ -41,15 +42,22 @@ export function FriendPlantCard({ friend }: FriendPlantCardProps) {
 
       <div className="flex items-center gap-3 pt-1">
         {/* Plant icon */}
-        <div className="soft-preview-bg flex h-16 w-16 shrink-0 items-center justify-center rounded-md border border-border shadow-sm">
-          <span className="text-2xl">🌿</span>
+        <div className="soft-preview-bg flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border shadow-sm">
+          {friend.imageUrl ? (
+            <img src={friend.imageUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span className="text-2xl">🌿</span>
+          )}
         </div>
 
         {/* Info */}
         <div className="min-w-0 flex-1 pr-16">
           <h3 className="truncate font-pixel text-[10px] leading-relaxed text-foreground">
-            {friend.name}
+            {ownerName}
           </h3>
+          <p className="mt-0.5 truncate text-[10px] leading-snug text-muted-foreground">
+            {friend.name}
+          </p>
           {friend.description && (
             <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-muted-foreground">
               {friend.description}
@@ -97,7 +105,7 @@ export function FriendPlantCard({ friend }: FriendPlantCardProps) {
         <button
           onClick={() => removeFriendPlant(friend.id)}
           className="flex min-h-11 items-center justify-center rounded-md border border-border bg-card px-2 py-1.5 font-pixel text-[8px] text-muted-foreground transition-colors hover:border-destructive hover:text-destructive"
-          aria-label={`Remove ${friend.name}`}
+          aria-label={`Remove ${ownerName}`}
           title="Remove friend plant"
         >
           <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />

@@ -4,15 +4,12 @@
  * Firebase only activates when NEXT_PUBLIC_FIREBASE_API_KEY is set AND firebase package exists.
  */
 
-export async function getFirebaseDB() {
+async function getFirebaseApp() {
   const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY
   if (!apiKey) return null
 
   try {
-    const [{ initializeApp, getApps }, { getDatabase }] = await Promise.all([
-      import('firebase/app' as string) as Promise<typeof import('firebase/app')>,
-      import('firebase/database' as string) as Promise<typeof import('firebase/database')>,
-    ])
+    const { initializeApp, getApps } = await import('firebase/app' as string) as typeof import('firebase/app')
 
     const config = {
       apiKey,
@@ -24,10 +21,33 @@ export async function getFirebaseDB() {
       appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
     }
 
-    const app = getApps().length ? getApps()[0] : initializeApp(config)
-    return getDatabase(app)
+    return getApps().length ? getApps()[0] : initializeApp(config)
   } catch {
     // firebase package not installed yet
+    return null
+  }
+}
+
+export async function getFirebaseDB() {
+  try {
+    const app = await getFirebaseApp()
+    if (!app) return null
+
+    const { getDatabase } = await import('firebase/database' as string) as typeof import('firebase/database')
+    return getDatabase(app)
+  } catch {
+    return null
+  }
+}
+
+export async function getFirebaseStorage() {
+  try {
+    const app = await getFirebaseApp()
+    if (!app) return null
+
+    const { getStorage } = await import('firebase/storage' as string) as typeof import('firebase/storage')
+    return getStorage(app)
+  } catch {
     return null
   }
 }

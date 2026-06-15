@@ -1,8 +1,8 @@
 'use client'
 
-import { use, useState, useEffect, useCallback } from 'react'
+import { use, useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { useGameStore } from '@/lib/store'
+import { getPlantGroupConfig, useGameStore } from '@/lib/store'
 import { Button } from '@/components/ui/button'
 import { publishToFirebase, unpublishFromFirebase } from '@/lib/firebase/plant-sync'
 import type { QRPayload } from '@/lib/firebase/plant-sync'
@@ -22,6 +22,7 @@ export default function PlantQRPage({ params }: PageProps) {
   const [isToggling, setIsToggling] = useState(false)
   const [shareError, setShareError] = useState<string | null>(null)
   const [shareNotice, setShareNotice] = useState<string | null>(null)
+  const autoPublishRef = useRef(false)
   const [ownerUid] = useState(() => {
     // Generate a persistent anonymous UID for this device
     if (typeof window === 'undefined') return 'anon'
@@ -73,6 +74,43 @@ export default function PlantQRPage({ params }: PageProps) {
     generateQR()
   }, [generateQR])
 
+  useEffect(() => {
+    setIsPublic(plant?.isPublic ?? false)
+  }, [plant?.isPublic])
+
+  const enablePublicSharing = useCallback(async (showNotice = true) => {
+    if (!plant) return false
+
+    const hp = getPlantHp(plant.id)
+    const publicPlant = {
+      ...plant,
+      isPublic: true,
+      placedItems: (plant.placedItems || []).map((item) => ({
+        ...item,
+        isShared: true,
+      })),
+    }
+    const success = await publishToFirebase(publicPlant, ownerUid, hp)
+    if (success) {
+      setIsPublic(true)
+      setPlantPublic(plant.id, true)
+      if (showNotice) setShareNotice('Public sharing is on for this QR.')
+    } else {
+      setShareError('Could not enable sharing. Check Firebase configuration or network.')
+    }
+    return success
+  }, [getPlantHp, ownerUid, plant, setPlantPublic])
+
+  useEffect(() => {
+    if (!plant || isPublic || autoPublishRef.current) return
+
+    autoPublishRef.current = true
+    setIsToggling(true)
+    setShareError(null)
+    setShareNotice(null)
+    enablePublicSharing(false).finally(() => setIsToggling(false))
+  }, [enablePublicSharing, isPublic, plant])
+
   // Toggle public mode
   const handleTogglePublic = async () => {
     if (!plant) return
@@ -84,22 +122,7 @@ export default function PlantQRPage({ params }: PageProps) {
       const newPublicState = !isPublic
 
       if (newPublicState) {
-        const hp = getPlantHp(plant.id)
-        const publicPlant = {
-          ...plant,
-          isPublic: true,
-          placedItems: (plant.placedItems || []).map((item) => ({
-            ...item,
-            isShared: true,
-          })),
-        }
-        const success = await publishToFirebase(publicPlant, ownerUid, hp)
-        if (success) {
-          setIsPublic(true)
-          setPlantPublic(plant.id, true)
-        } else {
-          setShareError('Could not enable sharing. Check Firebase configuration or network.')
-        }
+        await enablePublicSharing()
       } else {
         const success = await unpublishFromFirebase(plant.id, ownerUid)
         if (success) {
@@ -144,6 +167,7 @@ export default function PlantQRPage({ params }: PageProps) {
 
   const hp = getPlantHp(plant.id)
   const placedItemCount = plant.placedItems?.length ?? 0
+  const groupConfig = getPlantGroupConfig(plant.plantGroup)
   const shareUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/scan-friend?ownerUid=${encodeURIComponent(ownerUid)}&plantId=${encodeURIComponent(plant.id)}`
     : ''
@@ -162,7 +186,7 @@ export default function PlantQRPage({ params }: PageProps) {
             </p>
           )}
           <p className="mt-1 font-pixel text-[8px] text-muted-foreground">
-            HP: {hp}/100 • Items: {placedItemCount}
+            HP: {hp}/100 • Items: {placedItemCount} • {groupConfig.label}
           </p>
         </div>
 
@@ -192,7 +216,8 @@ export default function PlantQRPage({ params }: PageProps) {
             <p className="mt-0.5 text-[10px] text-muted-foreground">
               {isPublic
                 ? 'Friends can see HP via QR'
-                : 'Enable sharing to show friends'}
+                : isToggling ? 'Turning sharing on...'
+                : 'Sharing turns on automatically'}
             </p>
           </div>
           <button
@@ -231,7 +256,7 @@ export default function PlantQRPage({ params }: PageProps) {
 
         {/* Instructions */}
         <p className="mt-4 text-xs text-muted-foreground">
-          Friends can scan this QR or open the share link after Public Mode is enabled.
+          Friends can scan this QR or open the share link. Public Mode turns on automatically for QR sharing.
         </p>
       </div>
 

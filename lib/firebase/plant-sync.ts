@@ -17,12 +17,23 @@ export interface SharedPlacedItem {
 }
 
 export interface PublicPlantData {
+  ownerUid?: string
+  plantId?: string
   name: string
   description: string
+  imageUrl?: string
+  plantGroup?: Plant['plantGroup']
+  waterCycle?: number
+  lastWatered?: number
   hp: number
   species?: string
   placedItems: SharedPlacedItem[]
   lastUpdated: number
+}
+
+export interface PublicNeighborPlant extends PublicPlantData {
+  ownerUid: string
+  plantId: string
 }
 
 type FirebasePlacedItems = SharedPlacedItem[] | Record<string, SharedPlacedItem | null>
@@ -32,8 +43,12 @@ export interface OwnedPlantData {
   name: string
   description: string
   imageUrl: string
+  plantGroup: Plant['plantGroup']
+  waterCycle: number
+  water_cycle: number
   hp: number
   lastWatered: number
+  last_watered_time: number
   lastWipedAt: number
   createdAt: number
   isPublic: boolean
@@ -121,15 +136,45 @@ function normalizePublicPlantData(value: unknown): PublicPlantData | null {
 
   const data = value as Partial<Omit<PublicPlantData, 'placedItems'>> & {
     placedItems?: unknown
+    plant_group?: unknown
+    water_cycle?: unknown
+    last_watered_time?: unknown
   }
 
   return {
+    ownerUid: typeof data.ownerUid === 'string' ? data.ownerUid : undefined,
+    plantId: typeof data.plantId === 'string' ? data.plantId : undefined,
     name: typeof data.name === 'string' ? data.name : 'Friend Plant',
     description: typeof data.description === 'string' ? data.description : '',
+    imageUrl: typeof data.imageUrl === 'string' ? data.imageUrl : undefined,
+    plantGroup: typeof data.plantGroup === 'string'
+      ? data.plantGroup as Plant['plantGroup']
+      : typeof data.plant_group === 'string'
+        ? data.plant_group as Plant['plantGroup']
+        : undefined,
+    waterCycle: typeof data.waterCycle === 'number'
+      ? data.waterCycle
+      : typeof data.water_cycle === 'number'
+        ? data.water_cycle
+        : undefined,
+    lastWatered: typeof data.lastWatered === 'number'
+      ? data.lastWatered
+      : typeof data.last_watered_time === 'number'
+        ? data.last_watered_time
+        : undefined,
     hp: typeof data.hp === 'number' ? Math.max(0, Math.min(100, data.hp)) : 0,
     species: typeof data.species === 'string' ? data.species : undefined,
     placedItems: normalizePlacedItems(data.placedItems),
     lastUpdated: typeof data.lastUpdated === 'number' ? data.lastUpdated : Date.now(),
+  }
+}
+
+function normalizeOwnedPlantData(value: unknown): Pick<PublicPlantData, 'imageUrl'> | null {
+  if (!value || typeof value !== 'object') return null
+
+  const data = value as Partial<OwnedPlantData>
+  return {
+    imageUrl: typeof data.imageUrl === 'string' ? data.imageUrl : undefined,
   }
 }
 
@@ -158,13 +203,23 @@ export async function publishToFirebase(
     if (!db) return false
 
     const { ref, set } = await import('firebase/database' as string) as typeof import('firebase/database')
+    const now = Date.now()
 
     const data = {
+      ownerUid,
+      plantId: plant.id,
       name: plant.name,
       description: plant.description ?? '',
+      imageUrl: plant.imageUrl,
+      plantGroup: plant.plantGroup,
+      plant_group: plant.plantGroup,
+      waterCycle: plant.waterCycle,
+      water_cycle: plant.waterCycle,
+      lastWatered: plant.lastWatered,
+      last_watered_time: plant.lastWatered,
       hp,
       placedItems: serializePlacedItems(plant, true),
-      lastUpdated: Date.now(),
+      lastUpdated: now,
     }
 
     await set(ref(db, `plantcraft-public/${ownerUid}/${plant.id}`), data)
@@ -190,8 +245,12 @@ export async function publishOwnedPlantToFirebase(
       name: plant.name,
       description: plant.description ?? '',
       imageUrl: plant.imageUrl,
+      plantGroup: plant.plantGroup,
+      waterCycle: plant.waterCycle,
+      water_cycle: plant.waterCycle,
       hp,
       lastWatered: plant.lastWatered,
+      last_watered_time: plant.lastWatered,
       lastWipedAt: plant.lastWipedAt,
       createdAt: plant.createdAt,
       isPublic: plant.isPublic,
@@ -332,5 +391,58 @@ export async function fetchPlantOnce(
     return snapshot.exists() ? normalizePublicPlantData(snapshot.val()) : null
   } catch {
     return null
+  }
+}
+
+function shuffleNeighbors<T>(items: T[]): T[] {
+  return [...items].sort(() => Math.random() - 0.5)
+}
+
+export async function fetchRandomPublicPlants(
+  limit = 6,
+  excludeOwnerUid?: string
+): Promise<PublicNeighborPlant[]> {
+  try {
+    const db = await getDB()
+    if (!db) return []
+
+    const { ref, get } = await import('firebase/database' as string) as typeof import('firebase/database')
+    const [publicSnapshot, ownedSnapshot] = await Promise.all([
+      get(ref(db, 'plantcraft-public')),
+      get(ref(db, 'plantcraft-plants')),
+    ])
+    if (!publicSnapshot.exists()) return []
+
+    const root = publicSnapshot.val()
+    if (!root || typeof root !== 'object') return []
+    const ownedRoot = ownedSnapshot.exists() && ownedSnapshot.val() && typeof ownedSnapshot.val() === 'object'
+      ? ownedSnapshot.val() as Record<string, unknown>
+      : {}
+
+    const neighbors: PublicNeighborPlant[] = []
+    Object.entries(root as Record<string, unknown>).forEach(([ownerUid, ownerPlants]) => {
+      if (ownerUid === excludeOwnerUid) return
+      if (!ownerPlants || typeof ownerPlants !== 'object') return
+
+      Object.entries(ownerPlants as Record<string, unknown>).forEach(([plantId, value]) => {
+        const normalized = normalizePublicPlantData(value)
+        if (!normalized) return
+        const ownedPlant = ownerUid in ownedRoot && ownedRoot[ownerUid] && typeof ownedRoot[ownerUid] === 'object'
+          ? normalizeOwnedPlantData((ownedRoot[ownerUid] as Record<string, unknown>)[plantId])
+          : null
+
+        neighbors.push({
+          ...normalized,
+          imageUrl: normalized.imageUrl || ownedPlant?.imageUrl,
+          ownerUid,
+          plantId,
+        })
+      })
+    })
+
+    return shuffleNeighbors(neighbors)
+      .slice(0, Math.max(0, limit))
+  } catch {
+    return []
   }
 }

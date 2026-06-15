@@ -46,6 +46,7 @@ export function ScanResultModal({ result, plantId, open, onOpenChange }: ScanRes
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
+        style={{ zIndex: 10060 }}
         className={cn(
           'w-[min(94vw,430px)] overflow-hidden rounded-xl border-2 bg-card p-0 shadow-2xl',
           isHealthy ? 'border-primary/65' : 'border-destructive/65'

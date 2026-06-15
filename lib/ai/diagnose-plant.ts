@@ -51,14 +51,27 @@ export async function diagnosePlant(
 /**
  * Capture a frame from a video element as a JPEG Blob.
  */
-export async function captureVideoFrame(videoElement: HTMLVideoElement): Promise<Blob> {
-  const canvas = document.createElement('canvas')
-  canvas.width = videoElement.videoWidth
-  canvas.height = videoElement.videoHeight
-  const ctx = canvas.getContext('2d')!
-  ctx.drawImage(videoElement, 0, 0)
+export async function captureVideoFrame(
+  videoElement: HTMLVideoElement,
+  options: { maxSize?: number; quality?: number } = {}
+): Promise<Blob> {
+  const sourceWidth = videoElement.videoWidth || videoElement.clientWidth || 1
+  const sourceHeight = videoElement.videoHeight || videoElement.clientHeight || 1
+  const maxSize = options.maxSize ?? Math.max(sourceWidth, sourceHeight)
+  const scale = Math.min(1, maxSize / Math.max(sourceWidth, sourceHeight))
+  const outputWidth = Math.max(1, Math.round(sourceWidth * scale))
+  const outputHeight = Math.max(1, Math.round(sourceHeight * scale))
 
-  return new Promise((resolve) => {
-    canvas.toBlob((blob) => resolve(blob!), 'image/jpeg', 0.92)
+  const canvas = document.createElement('canvas')
+  canvas.width = outputWidth
+  canvas.height = outputHeight
+  const ctx = canvas.getContext('2d')!
+  ctx.drawImage(videoElement, 0, 0, outputWidth, outputHeight)
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob)
+      else reject(new Error('Could not capture camera frame.'))
+    }, 'image/jpeg', options.quality ?? 0.92)
   })
 }

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Camera, ImagePlus, Plus, Upload } from 'lucide-react'
-import { type Plant, useGameStore } from '@/lib/store'
+import { PLANT_GROUPS, getPlantGroupConfig, type Plant, type PlantGroup, useGameStore } from '@/lib/store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -24,6 +24,7 @@ export function AddPlantModal({ open, onOpenChange, plant }: AddPlantModalProps)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [imageUrl, setImageUrl] = useState('')
+  const [plantGroup, setPlantGroup] = useState<PlantGroup>('default')
   const [isCapturing, setIsCapturing] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -99,6 +100,7 @@ export function AddPlantModal({ open, onOpenChange, plant }: AddPlantModalProps)
     setName(plant?.name ?? '')
     setDescription(plant?.description ?? '')
     setImageUrl(plant?.imageUrl ?? '')
+    setPlantGroup(plant?.plantGroup ?? 'default')
     setCameraError(null)
     stopCamera()
   }, [open, plant, stopCamera])
@@ -141,18 +143,22 @@ export function AddPlantModal({ open, onOpenChange, plant }: AddPlantModalProps)
 
   const handleSubmit = () => {
     if (!name.trim()) return
+    const groupConfig = getPlantGroupConfig(plantGroup)
     if (plant) {
       updatePlant(plant.id, {
         name: name.trim(),
         description: description.trim(),
         imageUrl,
+        plantGroup,
+        waterCycle: groupConfig.waterCycleMs,
       })
     } else {
-      addPlant(name.trim(), imageUrl, description.trim())
+      addPlant(name.trim(), imageUrl, description.trim(), plantGroup)
     }
     setName('')
     setDescription('')
     setImageUrl('')
+    setPlantGroup('default')
     onOpenChange(false)
   }
 
@@ -161,8 +167,11 @@ export function AddPlantModal({ open, onOpenChange, plant }: AddPlantModalProps)
     setName('')
     setDescription('')
     setImageUrl('')
+    setPlantGroup('default')
     onOpenChange(false)
   }
+
+  const selectedGroup = getPlantGroupConfig(plantGroup)
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -211,6 +220,32 @@ export function AddPlantModal({ open, onOpenChange, plant }: AddPlantModalProps)
             </span>
           </div>
 
+          <div>
+            <label className="font-pixel text-[10px] text-muted-foreground">
+              Nhóm cây
+            </label>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {PLANT_GROUPS.map((group) => (
+                <button
+                  key={group.id}
+                  type="button"
+                  onClick={() => setPlantGroup(group.id)}
+                  className={`min-h-20 rounded-md border-2 p-2 text-left transition-all ${
+                    plantGroup === group.id
+                      ? 'border-primary bg-primary/10 shadow-sm'
+                      : 'border-border bg-card/80 hover:border-primary/50'
+                  }`}
+                >
+                  <span className="block font-pixel text-[8px] text-foreground">{group.label}</span>
+                  <span className="mt-1 block text-[10px] leading-snug text-muted-foreground">{group.description}</span>
+                </button>
+              ))}
+            </div>
+            <div className="mt-2 rounded-md border border-primary/20 bg-secondary/55 px-3 py-2 text-xs text-muted-foreground">
+              Chu kỳ tưới: <span className="font-pixel text-[8px] text-primary">{Math.round(selectedGroup.waterCycleMs / 86400000)} ngày</span>
+            </div>
+          </div>
+
           {/* Photo Capture */}
           <div>
             <label className="font-pixel text-[10px] text-muted-foreground">
@@ -223,7 +258,7 @@ export function AddPlantModal({ open, onOpenChange, plant }: AddPlantModalProps)
               onChange={handleFileUpload}
               className="hidden"
             />
-            <div className="relative mt-1 aspect-square w-full overflow-hidden rounded-lg border-2 border-border bg-muted scanner-frame">
+            <div className="relative mt-1 aspect-square min-h-[18rem] w-full overflow-hidden rounded-lg border-2 border-border bg-muted scanner-frame sm:min-h-0">
               <video
                 ref={videoRef}
                 autoPlay
@@ -235,10 +270,12 @@ export function AddPlantModal({ open, onOpenChange, plant }: AddPlantModalProps)
                 <>
                   <Button
                     onClick={capturePhoto}
-                    className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-md bg-primary font-pixel text-[10px] text-primary-foreground shadow-lg"
+                    size="icon-lg"
+                    className="absolute bottom-4 left-1/2 h-14 w-14 -translate-x-1/2 rounded-full bg-primary p-0 text-primary-foreground shadow-lg ring-4 ring-card/80 hover:bg-primary/90"
+                    title="Capture photo"
+                    aria-label="Capture photo"
                   >
-                    <Camera className="h-4 w-4" aria-hidden="true" />
-                    Capture
+                    <Camera className="h-6 w-6" aria-hidden="true" />
                   </Button>
                 </>
               ) : imageUrl ? (

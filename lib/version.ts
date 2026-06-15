@@ -2,10 +2,22 @@
  * App version — update this after each fix or feature change.
  * Format: major.minor.patch
  */
-export const APP_VERSION = '1.5.2'
+export const APP_VERSION = '1.6.4'
 
 /**
  * Changelog (latest first):
+ * 1.6.4 - Backfill neighbor map plant images from owned plant records and
+ *         refresh same-day neighbor cache when cached nodes are missing images
+ * 1.6.3 - Lower AR effect/aura placement and make avatar capture update
+ *         locally immediately while Firebase sync runs in the background
+ * 1.6.2 - Keep neighbor map popups inside the map and restore plant avatars
+ *         on neighbor markers when shared images are available
+ * 1.6.1 - Fix add-plant camera capture sizing, prioritize AR scan overlays,
+ *         make avatar capture update immediately, auto-public QR sharing,
+ *         and show account-style neighbor names with plant avatar popups
+ * 1.6.0 - Add plant-group water cycles with wilt alerts, daily cached
+ *         neighbor map rotation, and AR camera avatar capture to Firebase
+ *         Storage/user profile
  * 1.5.2 - Audit AR preset placement, friend sharing, and rescue missions:
  *         remove hidden AR locking, republish public slot changes, and prevent
  *         rescue checklist cooldown deadlocks

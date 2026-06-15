@@ -9,6 +9,7 @@ import { ARToolbar } from '@/components/ar-toolbar'
 import { ScanResultModal } from '@/components/scan-result-modal'
 import { FilterEngine, type ARFrameState, type BBox } from '@/lib/filter/filter-engine'
 import { subscribeToPlant, type PublicPlantData } from '@/lib/firebase/plant-sync'
+import { captureVideoFrame } from '@/lib/ai/diagnose-plant'
 import { Button } from '@/components/ui/button'
 
 const DEFAULT_AR_STATE: ARFrameState = {
@@ -43,8 +44,10 @@ function CameraContent() {
   const [friendData, setFriendData] = useState<PublicPlantData | null>(null)
   const [deleteMode, setDeleteMode] = useState(false)
   const [arState, setArState] = useState<ARFrameState>(DEFAULT_AR_STATE)
+  const [isAvatarUploading, setIsAvatarUploading] = useState(false)
+  const [avatarStatus, setAvatarStatus] = useState<string | null>(null)
 
-  const { plants, friendPlants, savePlacedItem, removePlacedItem, addCareLog, updateFriendPlant } = useGameStore()
+  const { plants, friendPlants, savePlacedItem, removePlacedItem, addCareLog, updateFriendPlant, updateAvatarFromBlob, syncAvatarFromBlob } = useGameStore()
   const plant = plants.find((p) => p.id === plantId)
   const selectedItem = selectedItemId ? SHOP_ITEMS.find((item) => item.id === selectedItemId) : null
 
@@ -62,6 +65,10 @@ function CameraContent() {
       setFriendData({
         name: local.name,
         description: local.description,
+        imageUrl: local.imageUrl,
+        plantGroup: local.plantGroup,
+        waterCycle: local.waterCycle,
+        lastWatered: local.lastWatered,
         hp: local.hp,
         placedItems: local.placedItems,
         lastUpdated: local.lastUpdated,
@@ -79,6 +86,10 @@ function CameraContent() {
         updateFriendPlant(current.id, {
           name: data.name,
           description: data.description,
+          imageUrl: data.imageUrl,
+          plantGroup: data.plantGroup,
+          waterCycle: data.waterCycle,
+          lastWatered: data.lastWatered,
           hp: data.hp,
           placedItems: data.placedItems ?? [],
           lastUpdated: data.lastUpdated,
@@ -243,6 +254,33 @@ function CameraContent() {
     }
   }
 
+  const handleCaptureAvatar = useCallback(async () => {
+    const video = videoRef.current
+    if (!video || video.readyState < 2) {
+      setAvatarStatus('Camera frame is not ready.')
+      window.setTimeout(() => setAvatarStatus(null), 2400)
+      return
+    }
+
+    setIsAvatarUploading(true)
+    setAvatarStatus(null)
+
+    try {
+      const blob = await captureVideoFrame(video, { maxSize: 384, quality: 0.76 })
+      const previewUpdated = await updateAvatarFromBlob(blob)
+      setAvatarStatus(previewUpdated ? 'Avatar updated.' : 'Avatar preview failed.')
+
+      if (previewUpdated) {
+        void syncAvatarFromBlob(blob).catch(console.warn)
+      }
+    } catch {
+      setAvatarStatus('Avatar capture failed.')
+    } finally {
+      setIsAvatarUploading(false)
+      window.setTimeout(() => setAvatarStatus(null), 2600)
+    }
+  }, [syncAvatarFromBlob, updateAvatarFromBlob])
+
   if (!plantId && !isFriendMode) {
     return (
       <div className="flex h-screen flex-col bg-background p-4 pt-12">
@@ -346,6 +384,9 @@ function CameraContent() {
               }}
               arState={arState}
               onPlaceSelected={handlePlaceSelected}
+              onCaptureAvatar={handleCaptureAvatar}
+              isAvatarUploading={isAvatarUploading}
+              avatarStatus={avatarStatus}
             />
           )}
 
@@ -466,7 +507,7 @@ function ARStatusOverlay({
 
   return (
     <div
-      className="pointer-events-none fixed left-1/2 top-[100px] z-[9998] w-[min(88vw,360px)] -translate-x-1/2 rounded-md border px-4 py-2.5 text-center shadow-lg backdrop-blur-sm transition-colors"
+      className="pointer-events-none fixed left-1/2 top-[calc(max(5rem,env(safe-area-inset-top)+4.5rem))] z-[10010] w-[min(88vw,360px)] -translate-x-1/2 rounded-md border px-4 py-2.5 text-center shadow-lg backdrop-blur-sm transition-colors"
       style={{
         borderColor: isReady ? 'rgba(53, 233, 130, 0.78)' : 'rgba(255, 255, 255, 0.15)',
         background: isReady ? 'rgba(10, 52, 32, 0.62)' : 'rgba(0, 0, 0, 0.5)',

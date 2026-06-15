@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Activity,
+  ExternalLink,
   Clock3,
   Droplets,
   History,
@@ -11,8 +13,18 @@ import {
   Sparkles,
   Sprout,
   TreeDeciduous,
+  Users,
+  X,
 } from 'lucide-react'
-import { CARE_ACTION_COOLDOWN_MS, type Plant, useGameStore } from '@/lib/store'
+import {
+  formatWaterCycleRemaining,
+  getFriendOwnerName,
+  getWaterCycleProgress,
+  getWaterCycleRemainingMs,
+  type FriendPlant,
+  type Plant,
+  useGameStore,
+} from '@/lib/store'
 import { PlantCard } from '@/components/plant-card'
 import { EmptyGarden } from '@/components/empty-garden'
 import { AddPlantModal } from '@/components/add-plant-modal'
@@ -33,7 +45,16 @@ const MAP_POSITIONS = [
   { x: 56, y: 78 },
 ] as const
 
-type PlantStatus = 'healthy' | 'care' | 'critical' | 'diagnosis'
+const NEIGHBOR_POSITIONS = [
+  { x: 15, y: 24 },
+  { x: 83, y: 22 },
+  { x: 12, y: 78 },
+  { x: 88, y: 74 },
+  { x: 50, y: 12 },
+  { x: 50, y: 88 },
+] as const
+
+type PlantStatus = 'healthy' | 'care' | 'critical' | 'diagnosis' | 'wilted'
 
 interface PlantStat {
   plant: Plant
@@ -43,6 +64,14 @@ interface PlantStat {
   needsWater: boolean
   needsWipe: boolean
   hasDiagnosis: boolean
+  waterRemaining: number
+  waterProgress: number
+  isWaterOverdue: boolean
+}
+
+interface NeighborStat {
+  neighbor: FriendPlant
+  position: (typeof NEIGHBOR_POSITIONS)[number]
 }
 
 interface CareTask {
@@ -55,8 +84,92 @@ interface CareTask {
   action: () => void
 }
 
-function getPlantTone(hp: number, hasDiagnosis: boolean): PlantStatus {
+function NeighborMarker({
+  stat,
+  onOpen,
+}: {
+  stat: NeighborStat
+  onOpen: (neighbor: FriendPlant) => void
+}) {
+  const displayName = getFriendOwnerName(stat.neighbor.ownerUid)
+  const markerStyle = {
+    left: `${stat.position.x}%`,
+    top: `${stat.position.y}%`,
+  } as CSSProperties
+
+  return (
+    <button
+      type="button"
+      style={markerStyle}
+      className="neighbor-map-marker"
+      onClick={() => onOpen(stat.neighbor)}
+      aria-label={`Open neighbor ${displayName}`}
+    >
+      <span className="neighbor-map-marker-avatar">
+        <img src={stat.neighbor.imageUrl || '/placeholder-logo.png'} alt="" />
+      </span>
+      <span className="neighbor-map-marker-name font-pixel">{displayName}</span>
+    </button>
+  )
+}
+
+function NeighborPopup({
+  neighbor,
+  onClose,
+  onOpenAR,
+}: {
+  neighbor: FriendPlant
+  onClose: () => void
+  onOpenAR: (neighbor: FriendPlant) => void
+}) {
+  const displayName = getFriendOwnerName(neighbor.ownerUid)
+  const hpColor = neighbor.hp >= 70 ? '#4CAF50' : neighbor.hp >= 40 ? '#FFC107' : '#F44336'
+
+  return (
+    <div className="neighbor-map-popup" role="dialog" aria-label={`${displayName} plant preview`}>
+      <button
+        type="button"
+        className="neighbor-map-popup-close"
+        onClick={onClose}
+        aria-label="Close neighbor preview"
+      >
+        <X className="h-3.5 w-3.5" aria-hidden="true" />
+      </button>
+      <div className="flex items-center gap-3">
+        <div className="neighbor-map-popup-avatar">
+          <img src={neighbor.imageUrl || '/placeholder-logo.png'} alt="" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-pixel text-[10px] text-foreground">{displayName}</div>
+          <div className="mt-1 truncate text-xs text-muted-foreground">{neighbor.name}</div>
+          <div className="mt-2 flex items-center gap-2">
+            <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted ring-1 ring-border/70">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{ width: `${neighbor.hp}%`, background: hpColor }}
+              />
+            </div>
+            <span className="font-pixel text-[7px]" style={{ color: hpColor }}>
+              {neighbor.hp}
+            </span>
+          </div>
+        </div>
+      </div>
+      <button
+        type="button"
+        className="neighbor-map-popup-action"
+        onClick={() => onOpenAR(neighbor)}
+      >
+        <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+        View AR
+      </button>
+    </div>
+  )
+}
+
+function getPlantTone(hp: number, hasDiagnosis: boolean, isWaterOverdue: boolean): PlantStatus {
   if (hasDiagnosis) return 'diagnosis'
+  if (isWaterOverdue) return 'wilted'
   if (hp < 30) return 'critical'
   if (hp < 75) return 'care'
   return 'healthy'
@@ -96,17 +209,31 @@ function getCareLabel(action: string) {
 }
 
 export default function DashboardPage() {
+  const router = useRouter()
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [selectedPlantId, setSelectedPlantId] = useState<string | null>(null)
+  const [selectedNeighborId, setSelectedNeighborId] = useState<string | null>(null)
   const [editingPlantId, setEditingPlantId] = useState<string | null>(null)
   const [clock, setClock] = useState(() => Date.now())
-  const { plants, careLogs, getPlantHp, waterPlant, wipePlant } = useGameStore()
+  const {
+    plants,
+    careLogs,
+    userProfile,
+    getPlantHp,
+    waterPlant,
+    wipePlant,
+    refreshDailyNeighbors,
+  } = useGameStore()
 
   useEffect(() => {
     const interval = window.setInterval(() => setClock(Date.now()), 30000)
     return () => window.clearInterval(interval)
   }, [])
+
+  useEffect(() => {
+    refreshDailyNeighbors().catch(console.warn)
+  }, [refreshDailyNeighbors])
 
   useEffect(() => {
     if (plants.length === 0) {
@@ -123,9 +250,11 @@ export default function DashboardPage() {
     return plants.map((plant, index) => {
       const hp = getPlantHp(plant.id)
       const hasDiagnosis = !!plant.pendingDiagnosis
-      const lastWatered = plant.lastWatered || plant.createdAt || clock
       const lastWipedAt = plant.lastWipedAt || plant.createdAt || 0
-      const needsWater = hp < 95 && clock - lastWatered >= CARE_ACTION_COOLDOWN_MS
+      const waterRemaining = getWaterCycleRemainingMs(plant, clock)
+      const waterProgress = getWaterCycleProgress(plant, clock)
+      const isWaterOverdue = waterRemaining <= 0
+      const needsWater = isWaterOverdue
       const needsWipe = clock - lastWipedAt >= WIPE_TASK_INTERVAL_MS
 
       return {
@@ -134,18 +263,76 @@ export default function DashboardPage() {
         hasDiagnosis,
         needsWater,
         needsWipe,
+        waterRemaining,
+        waterProgress,
+        isWaterOverdue,
         position: MAP_POSITIONS[index % MAP_POSITIONS.length],
-        status: getPlantTone(hp, hasDiagnosis),
+        status: getPlantTone(hp, hasDiagnosis, isWaterOverdue),
       }
     })
   }, [clock, getPlantHp, plants])
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return
+
+    plantStats.forEach((stat) => {
+      if (!stat.isWaterOverdue) return
+
+      const noticeKey = `plantcraft_wilt_notice_${stat.plant.id}_${stat.plant.lastWatered}`
+      if (window.localStorage.getItem(noticeKey)) return
+
+      const notify = () => {
+        new Notification('PlantCraft: cây đang héo', {
+          body: `${stat.plant.name} đã quá chu kỳ tưới. Vào Garden để chăm cây nhé.`,
+        })
+        window.localStorage.setItem(noticeKey, '1')
+      }
+
+      if (Notification.permission === 'granted') {
+        notify()
+      } else if (Notification.permission === 'default') {
+        Notification.requestPermission().then((permission) => {
+          if (permission === 'granted') notify()
+        })
+      }
+    })
+  }, [plantStats])
+
+  const neighborStats = useMemo<NeighborStat[]>(() => {
+    const neighborsByOwner = new Map<string, FriendPlant>()
+    for (const neighbor of userProfile?.dailyNeighbors ?? []) {
+      if (!neighborsByOwner.has(neighbor.ownerUid)) {
+        neighborsByOwner.set(neighbor.ownerUid, neighbor)
+      }
+    }
+
+    return [...neighborsByOwner.values()].slice(0, NEIGHBOR_POSITIONS.length).map((neighbor, index) => ({
+      neighbor,
+      position: NEIGHBOR_POSITIONS[index % NEIGHBOR_POSITIONS.length],
+    }))
+  }, [userProfile?.dailyNeighbors])
+
+  useEffect(() => {
+    if (!selectedNeighborId) return
+    if (!neighborStats.some((stat) => stat.neighbor.id === selectedNeighborId)) {
+      setSelectedNeighborId(null)
+    }
+  }, [neighborStats, selectedNeighborId])
+
   const selectedStat = plantStats.find((stat) => stat.plant.id === selectedPlantId) ?? plantStats[0]
   const selectedPlant = selectedStat?.plant
+  const selectedNeighbor = neighborStats.find((stat) => stat.neighbor.id === selectedNeighborId)?.neighbor ?? null
   const editingPlant = plants.find((plant) => plant.id === editingPlantId) ?? null
   const healthyCount = plantStats.filter((stat) => stat.status === 'healthy').length
-  const urgentCount = plantStats.filter((stat) => stat.status === 'critical' || stat.status === 'diagnosis').length
+  const urgentCount = plantStats.filter((stat) => stat.status === 'critical' || stat.status === 'diagnosis' || stat.status === 'wilted').length
   const gardenStability = plants.length > 0 ? Math.round((healthyCount / plants.length) * 100) : 0
+  const mapRefreshLabel = userProfile?.lastMapRefresh ?? 'today'
+  const openNeighbor = (neighbor: FriendPlant) => {
+    setSelectedNeighborId(neighbor.id)
+  }
+  const openNeighborAR = (neighbor: FriendPlant) => {
+    router.push(`/camera?friendOwner=${encodeURIComponent(neighbor.ownerUid)}&friendPlant=${encodeURIComponent(neighbor.plantId)}`)
+  }
 
   const careTasks = useMemo<CareTask[]>(() => {
     return plantStats
@@ -167,10 +354,10 @@ export default function DashboardPage() {
           tasks.push({
             id: `${stat.plant.id}-water`,
             plantId: stat.plant.id,
-            title: 'Water queue',
-            meta: `${stat.plant.name} - ${stat.hp} HP`,
+            title: 'Water cycle due',
+            meta: `${stat.plant.name} - ${formatWaterCycleRemaining(stat.waterRemaining)}`,
             icon: <Droplets className="h-3.5 w-3.5" aria-hidden="true" />,
-            tone: stat.hp < 40 ? 'danger' : 'warning',
+            tone: stat.hp < 70 ? 'danger' : 'warning',
             action: () => {
               setSelectedPlantId(stat.plant.id)
               waterPlant(stat.plant.id)
@@ -243,6 +430,22 @@ export default function DashboardPage() {
                   <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
                   <span className="font-pixel text-[7px]">Ready</span>
                 </div>
+                {neighborStats.length > 0 && (
+                  <div className="map-neighbor-pill">
+                    <Users className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span className="font-pixel text-[7px]">{neighborStats.length} neighbors</span>
+                  </div>
+                )}
+                {neighborStats.map((stat) => (
+                  <NeighborMarker key={stat.neighbor.id} stat={stat} onOpen={openNeighbor} />
+                ))}
+                {selectedNeighbor && (
+                  <NeighborPopup
+                    neighbor={selectedNeighbor}
+                    onClose={() => setSelectedNeighborId(null)}
+                    onOpenAR={openNeighborAR}
+                  />
+                )}
               </div>
             </div>
             <EmptyGarden onAddPlant={() => setIsAddModalOpen(true)} />
@@ -260,6 +463,21 @@ export default function DashboardPage() {
                     <Activity className="h-3.5 w-3.5" aria-hidden="true" />
                     <span className="font-pixel text-[7px]">{gardenStability}% stable</span>
                   </div>
+                  <div className="map-neighbor-pill">
+                    <Users className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span className="font-pixel text-[7px]">{neighborStats.length} • {mapRefreshLabel}</span>
+                  </div>
+
+                  {neighborStats.map((stat) => (
+                    <NeighborMarker key={stat.neighbor.id} stat={stat} onOpen={openNeighbor} />
+                  ))}
+                  {selectedNeighbor && (
+                    <NeighborPopup
+                      neighbor={selectedNeighbor}
+                      onClose={() => setSelectedNeighborId(null)}
+                      onOpenAR={openNeighborAR}
+                    />
+                  )}
 
                   {plantStats.map((stat) => {
                     const isSelected = stat.plant.id === selectedStat?.plant.id
@@ -267,6 +485,7 @@ export default function DashboardPage() {
                       left: `${stat.position.x}%`,
                       top: `${stat.position.y}%`,
                       '--marker-hp': `${stat.hp}%`,
+                      '--marker-water': `${stat.waterProgress}%`,
                     } as CSSProperties
 
                     return (

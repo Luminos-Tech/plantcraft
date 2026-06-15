@@ -15,7 +15,7 @@ import {
   Sparkles,
   Trophy,
 } from 'lucide-react'
-import { CARE_ACTION_COOLDOWN_MS, useGameStore } from '@/lib/store'
+import { CARE_ACTION_COOLDOWN_MS, getWaterCycleRemainingMs, useGameStore } from '@/lib/store'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
@@ -292,6 +292,7 @@ export default function MissionPage() {
 
   const sickPlants = plants.filter((plant) => !!plant.pendingDiagnosis)
   const firstSickPlant = sickPlants[0]
+  const dueWaterPlants = plants.filter((plant) => getWaterCycleRemainingMs(plant, now) <= 0)
   const waterTarget = 1
   const cleanTarget = 1
 
@@ -302,7 +303,11 @@ export default function MissionPage() {
         periodKey: dayWindow.key,
         kicker: 'Daily',
         title: 'Water run',
-        meta: plants.length > 0 ? 'Water plants in your garden.' : 'Add a plant to start this task.',
+        meta: dueWaterPlants.length > 0
+          ? `${dueWaterPlants[0].name} is past its water cycle.`
+          : plants.length > 0
+            ? 'No plants are due for water yet.'
+            : 'Add a plant to start this task.',
         icon: <Droplets className="h-5 w-5" aria-hidden="true" />,
         tone: 'daily',
         progress: Math.min(waterProgress, waterTarget),
@@ -310,7 +315,7 @@ export default function MissionPage() {
         reward: 20,
         deadlineAt: dayWindow.end,
         claimed: isClaimed('daily-water'),
-        available: plants.length > 0,
+        available: dueWaterPlants.length > 0,
         href: '/dashboard',
         actionLabel: 'Garden',
       },
@@ -349,7 +354,7 @@ export default function MissionPage() {
         actionLabel: plants.length > 0 ? 'Scan' : 'Garden',
       },
     ]
-  }, [careLogs, cleanTarget, dayWindow.end, dayWindow.key, dayWindow.start, missionClaims, plants, waterProgress, waterTarget])
+  }, [careLogs, cleanTarget, dayWindow.end, dayWindow.key, dayWindow.start, dueWaterPlants, missionClaims, plants, waterProgress, waterTarget])
 
   const emergencyTask = useMemo<MissionTask>(() => {
     const rescueCompletedToday = careLogs.some(
