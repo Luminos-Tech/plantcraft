@@ -2,10 +2,12 @@
  * App version — update this after each fix or feature change.
  * Format: major.minor.patch
  */
-export const APP_VERSION = '1.7.5'
+export const APP_VERSION = '1.7.6'
 
 /**
  * Changelog (latest first):
+ * 1.7.6 - Fix Add Plant mobile camera capture layout so the shutter button
+ *         stays fully visible below the live preview
  * 1.7.5 - Move the app header below iPhone safe areas and replace the
  *         Add to Home Screen icon with a plant-focused app icon
  * 1.7.4 - Capture plant photos with the visible AR overlay and add iOS/PWA

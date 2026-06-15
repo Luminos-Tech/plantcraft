@@ -520,11 +520,51 @@
   content: "";
   position: absolute;
   inset: 0;
+  z-index: 1;
   background:
     linear-gradient(90deg, transparent 0 46%, rgba(255, 255, 255, 0.16) 50%, transparent 54% 100%);
   mix-blend-mode: screen;
   transform: translateX(-120%);
   animation: scanner-frame-sheen 4.5s ease-in-out infinite;
+}
+
+.add-plant-photo-frame {
+  position: relative;
+  margin-top: 0.25rem;
+  width: 100%;
+  overflow: hidden;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  background: var(--muted);
+}
+
+.add-plant-photo-preview {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  min-height: min(18rem, calc(100vw - 4rem));
+  width: 100%;
+}
+
+.add-plant-camera-preview {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  min-height: min(15rem, calc((100vw - 4rem) * 0.72));
+  width: 100%;
+  overflow: hidden;
+  background: #111827;
+}
+
+.add-plant-camera-controls {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  min-height: 5rem;
+  align-items: center;
+  justify-content: center;
+  border-top: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(223, 243, 231, 0.92)),
+    var(--card);
 }
 
 .stable-bottom-nav {

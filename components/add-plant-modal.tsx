@@ -258,28 +258,33 @@ export function AddPlantModal({ open, onOpenChange, plant }: AddPlantModalProps)
               onChange={handleFileUpload}
               className="hidden"
             />
-            <div className="relative mt-1 aspect-square min-h-[18rem] w-full overflow-hidden rounded-lg border-2 border-border bg-muted scanner-frame sm:min-h-0">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className={`h-full w-full object-cover ${isCapturing ? 'block' : 'hidden'}`}
-              />
+            <div className="add-plant-photo-frame scanner-frame">
               {isCapturing ? (
                 <>
-                  <Button
-                    onClick={capturePhoto}
-                    size="icon-lg"
-                    className="absolute bottom-4 left-1/2 h-14 w-14 -translate-x-1/2 rounded-full bg-primary p-0 text-primary-foreground shadow-lg ring-4 ring-card/80 hover:bg-primary/90"
-                    title="Capture photo"
-                    aria-label="Capture photo"
-                  >
-                    <Camera className="h-6 w-6" aria-hidden="true" />
-                  </Button>
+                  <div className="add-plant-camera-preview">
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                  <div className="add-plant-camera-controls">
+                    <Button
+                      onClick={capturePhoto}
+                      type="button"
+                      size="icon"
+                      className="h-14 w-14 rounded-full bg-primary p-0 text-primary-foreground shadow-lg ring-4 ring-card/80 hover:bg-primary/90"
+                      title="Capture photo"
+                      aria-label="Capture photo"
+                    >
+                      <Camera className="h-6 w-6" aria-hidden="true" />
+                    </Button>
+                  </div>
                 </>
               ) : imageUrl ? (
-                <>
+                <div className="add-plant-photo-preview">
                   <img
                     src={imageUrl}
                     alt="Plant preview"
@@ -305,9 +310,9 @@ export function AddPlantModal({ open, onOpenChange, plant }: AddPlantModalProps)
                       Upload
                     </Button>
                   </div>
-                </>
+                </div>
               ) : (
-                <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-4">
+                <div className="add-plant-photo-preview flex flex-col items-center justify-center gap-3 p-4">
                   {cameraError && (
                     <p className="text-center font-pixel text-[8px] text-destructive">
                       {cameraError}
