@@ -42,11 +42,7 @@ export function RewardToast() {
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className="animate-reward-toast pointer-events-none rounded-md border-2 border-accent px-5 py-3 shadow-lg"
-          style={{
-            background: 'rgba(0,0,0,0.85)',
-            backdropFilter: 'blur(8px)',
-          }}
+          className="reward-toast animate-reward-toast pointer-events-none rounded-md border-2 border-accent px-5 py-3 shadow-lg"
         >
           <div className="flex items-center gap-3">
             {/* XP indicator */}

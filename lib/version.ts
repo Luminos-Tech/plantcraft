@@ -2,10 +2,21 @@
  * App version — update this after each fix or feature change.
  * Format: major.minor.patch
  */
-export const APP_VERSION = '1.4.7'
+export const APP_VERSION = '1.5.2'
 
 /**
  * Changelog (latest first):
+ * 1.5.2 - Audit AR preset placement, friend sharing, and rescue missions:
+ *         remove hidden AR locking, republish public slot changes, and prevent
+ *         rescue checklist cooldown deadlocks
+ * 1.5.1 - Apply preset decoration slots to friend sharing/public sync payloads
+ *         and normalize older shared items into the new slot system
+ * 1.5.0 - Change AR decoration placement to preset slots based on the detected
+ *         plant box, replacing free tap-based x/y positioning
+ * 1.4.9 - Refresh global effects with smoother glass surfaces, modern hover
+ *         states, animated map markers, reward shine, and ambient motion
+ * 1.4.8 - Rework Plant rescue into guided care missions that clear disease
+ *         and pay rewards only after users complete the rescue checklist
  * 1.4.7 - Remove AR lock frame controls, add camera plant picker back button,
  *         and remove the garden map scan control
  * 1.4.6 - Clean up garden map controls, add per-plant settings,

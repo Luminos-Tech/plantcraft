@@ -83,7 +83,7 @@ export function ShopItemCard({ item, onClick }: ShopItemCardProps) {
         isOwned ? 'border-primary/60' : canAfford ? 'border-border' : 'border-border opacity-80'
       )}
     >
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-[linear-gradient(90deg,var(--primary),var(--accent),#6BA6FF)] opacity-70" />
+      <div className="shop-card-divider pointer-events-none absolute inset-x-0 top-0 h-[2px] opacity-70" />
 
       {/* Badges */}
       <div className="absolute left-2 top-2.5 flex flex-col gap-1">
@@ -113,7 +113,7 @@ export function ShopItemCard({ item, onClick }: ShopItemCardProps) {
       )}
 
       {/* Item Preview */}
-      <div className="mt-4 flex h-20 w-full items-center justify-center rounded-md bg-[linear-gradient(135deg,var(--secondary),#ffffff)] ring-1 ring-border/60 sm:h-24">
+      <div className="soft-preview-bg mt-4 flex h-20 w-full items-center justify-center rounded-md ring-1 ring-border/60 sm:h-24">
         <ItemPreview item={item} />
       </div>
 

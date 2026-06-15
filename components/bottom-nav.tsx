@@ -27,7 +27,7 @@ export function BottomNav() {
   const isCameraActive = pathname.startsWith('/camera')
 
   return (
-    <nav className="stable-bottom-nav fixed bottom-0 left-0 right-0 z-50 border-t border-primary/20 bg-card/92 shadow-[0_-10px_30px_rgba(30,47,37,0.12)] backdrop-blur-xl lg:sticky lg:bottom-auto lg:top-[57px] lg:border-b lg:border-t-0 lg:shadow-sm">
+    <nav className="stable-bottom-nav app-bottom-nav fixed bottom-0 left-0 right-0 z-50 border-t border-primary/20 bg-card/92 shadow-[0_-10px_30px_rgba(30,47,37,0.12)] backdrop-blur-xl lg:sticky lg:bottom-auto lg:top-[57px] lg:border-b lg:border-t-0 lg:shadow-sm">
       <div className="mx-auto grid h-[4.6rem] max-w-[1180px] grid-cols-[1fr_1fr_5rem_1fr_1fr] items-center gap-1 px-2 lg:flex lg:h-14 lg:justify-center lg:gap-3">
         {sideItems.slice(0, 2).map((item) => {
           const isActive = pathname === item.href

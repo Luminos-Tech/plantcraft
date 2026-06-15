@@ -25,7 +25,7 @@ interface ARToolbarProps {
   deleteMode: boolean
   onDeleteModeChange: (mode: boolean) => void
   arState: ARFrameState
-  onAutoFitSelected: () => void
+  onPlaceSelected: () => void
 }
 
 export function ARToolbar({
@@ -37,7 +37,7 @@ export function ARToolbar({
   deleteMode,
   onDeleteModeChange,
   arState,
-  onAutoFitSelected,
+  onPlaceSelected,
 }: ARToolbarProps) {
   const [isScanning, setIsScanning] = useState(false)
   const [scanError, setScanError] = useState<string | null>(null)
@@ -128,9 +128,9 @@ export function ARToolbar({
 
   const selectedItem = selectedItemId ? SHOP_ITEMS.find((item) => item.id === selectedItemId) : null
   const selectedLabel = selectedItem?.name.replace(/\s+/g, ' ').slice(0, 10)
-  const readyLabel = arState.locked || arState.detected ? 'READY' : 'FIND'
-  const readyActive = arState.locked || arState.detected
-  const canUseAnchor = arState.locked || arState.detected
+  const readyLabel = arState.detected ? 'READY' : 'FIND'
+  const readyActive = arState.detected
+  const canUseAnchor = arState.detected
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-[9999] px-3 pb-3">
@@ -217,14 +217,14 @@ export function ARToolbar({
             </IconButton>
 
             <Button
-              onClick={onAutoFitSelected}
+              onClick={onPlaceSelected}
               disabled={!selectedItemId || deleteMode || !canUseAnchor}
               variant="outline"
               className="h-10 rounded-sm border-white/25 bg-white/10 font-pixel text-[8px] text-white hover:bg-white/20 disabled:opacity-40"
-              title="Place selected item at its default plant position"
+              title="Place selected item in its preset plant slot"
             >
               <Sparkles className="h-4 w-4" />
-              Fit
+              Place
             </Button>
 
             <Button

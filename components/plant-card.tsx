@@ -136,7 +136,7 @@ export function PlantCard({ plant, compact = false, selected = false, className,
                 className="h-full w-full object-cover"
               />
             ) : (
-              <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,var(--secondary),#ffffff)] text-3xl">
+              <div className="soft-preview-bg flex h-full w-full items-center justify-center text-3xl">
                 🌱
               </div>
             )}

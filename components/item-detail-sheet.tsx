@@ -102,7 +102,7 @@ export function ItemDetailSheet({ item, open, onOpenChange }: ItemDetailSheetPro
         </SheetHeader>
 
         <div className="mx-auto mt-5 flex w-full max-w-md flex-col items-center">
-          <div className="scanner-frame rounded-lg border-2 border-border bg-[linear-gradient(135deg,var(--secondary),#ffffff)] p-4">
+          <div className="scanner-frame soft-preview-bg rounded-lg border-2 border-border p-4">
             <RotatingPreview item={item} />
           </div>
 

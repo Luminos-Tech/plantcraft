@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback, Suspense } from 'react'
 import { ArrowLeft, Camera as CameraIcon, Leaf } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useGameStore, DiagnosisResult, PlacedItem, ITEM_DEFAULT_ANCHOR, SHOP_ITEMS } from '@/lib/store'
+import { useGameStore, DiagnosisResult, PlacedItem, dedupePlacedItemsBySlot, getDecorationPlacement, SHOP_ITEMS } from '@/lib/store'
 import { ARPlantHUD } from '@/components/ar-plant-hud'
 import { ARToolbar } from '@/components/ar-toolbar'
 import { ScanResultModal } from '@/components/scan-result-modal'
@@ -145,8 +145,7 @@ function CameraContent() {
         engine.start(
           getItems,
           getItemCategory,
-          (state) => setArState(state),
-          { autoLock: isFriendMode }
+          (state) => setArState(state)
         )
         setIsReady(true)
       } catch (err) {
@@ -172,29 +171,25 @@ function CameraContent() {
     }
   }, [plantId, isFriendMode, friendPlantId])
 
-  const ensureLockedAnchor = useCallback(() => {
+  const ensureDetectedAnchor = useCallback(() => {
     const engine = engineRef.current
     if (!engine) return null
     const state = engine.getState()
-    if (state.locked) return state
     if (!state.anchor || !state.detected) return null
-    const nextState = engine.lockAnchor()
-    setArState(nextState)
-    return nextState
+    setArState(state)
+    return state
   }, [])
 
-  const saveDecoration = useCallback((itemId: string, anchorX: number, anchorY: number, scaleRatio?: number) => {
+  const saveDecoration = useCallback((itemId: string) => {
     if (!plantId) return
 
-    const category = getItemCategory(itemId)
-    const defaults = ITEM_DEFAULT_ANCHOR[category]
+    const placement = getDecorationPlacement(itemId)
     const newItem: PlacedItem = {
       id: crypto.randomUUID(),
       itemId,
       plantId,
-      anchorX,
-      anchorY,
-      scaleRatio: scaleRatio ?? defaults?.scaleRatio ?? 0.35,
+      placementSlot: placement.placementSlot,
+      scaleRatio: placement.scaleRatio,
       isShared: plant?.isPublic ?? false,
       placedAt: Date.now(),
     }
@@ -203,25 +198,23 @@ function CameraContent() {
     addCareLog(plantId, 'decorate', `Placed ${SHOP_ITEMS.find((item) => item.id === itemId)?.name ?? 'item'}`)
   }, [addCareLog, plant?.isPublic, plantId, savePlacedItem])
 
-  const handleAutoFitSelected = useCallback(() => {
+  const handlePlaceSelected = useCallback(() => {
     if (!selectedItemId) return
-    const lockedState = ensureLockedAnchor()
-    if (!lockedState) return
+    const detectedState = ensureDetectedAnchor()
+    if (!detectedState) return
 
-    const category = getItemCategory(selectedItemId)
-    const defaults = ITEM_DEFAULT_ANCHOR[category] ?? ITEM_DEFAULT_ANCHOR.block
-    saveDecoration(selectedItemId, defaults.anchorX, defaults.anchorY, defaults.scaleRatio)
+    saveDecoration(selectedItemId)
     setSelectedItemId(null)
-  }, [ensureLockedAnchor, saveDecoration, selectedItemId])
+  }, [ensureDetectedAnchor, saveDecoration, selectedItemId])
 
   const handleCanvasTap = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (isFriendMode) return
     if (!plantId || !engineRef.current) return
-    if (!deleteMode && !selectedItemId) return
+    if (!deleteMode) return
 
     e.preventDefault()
-    const lockedState = ensureLockedAnchor()
-    if (!lockedState) return
+    const detectedState = ensureDetectedAnchor()
+    if (!detectedState) return
 
     const bbox = engineRef.current.getLastBbox()
     if (!bbox || !canvasRef.current) return
@@ -229,13 +222,10 @@ function CameraContent() {
     const rect = canvasRef.current.getBoundingClientRect()
     const tapX = e.clientX - rect.left
     const tapY = e.clientY - rect.top
-    const [bx, by, bw, bh] = bbox
-    const anchorX = (tapX - bx) / bw
-    const anchorY = (tapY - by) / bh
 
     if (deleteMode) {
       const currentPlant = useGameStore.getState().plants.find((p) => p.id === plantId)
-      const items = currentPlant?.placedItems ?? []
+      const items = dedupePlacedItemsBySlot(currentPlant?.placedItems ?? [])
       const closest = findClosestItem(items, bbox, tapX, tapY)
 
       if (closest) {
@@ -244,20 +234,12 @@ function CameraContent() {
       }
       return
     }
-
-    if (!selectedItemId) return
-    if (anchorX < -0.25 || anchorX > 1.25 || anchorY < -0.4 || anchorY > 1.25) return
-
-    const category = getItemCategory(selectedItemId)
-    const scaleRatio = ITEM_DEFAULT_ANCHOR[category]?.scaleRatio ?? 0.35
-    saveDecoration(selectedItemId, anchorX, anchorY, scaleRatio)
-    setSelectedItemId(null)
   }
 
   const handleScanComplete = (result: DiagnosisResult) => {
     setScanResult(result)
     if (plantId) {
-      addCareLog(plantId, 'scan', result.disease)
+      addCareLog(plantId, 'scan', result.isHealthy ? 'Healthy scan' : result.disease)
     }
   }
 
@@ -363,7 +345,7 @@ function CameraContent() {
                 if (mode) setSelectedItemId(null)
               }}
               arState={arState}
-              onAutoFitSelected={handleAutoFitSelected}
+              onPlaceSelected={handlePlaceSelected}
             />
           )}
 
@@ -416,10 +398,11 @@ function findClosestItem(items: PlacedItem[], bbox: BBox, tapX: number, tapY: nu
   let closestDist = Infinity
 
   for (const item of items) {
-    const itemX = bx + bw * item.anchorX
-    const itemY = by + bh * item.anchorY
+    const placement = getDecorationPlacement(item.itemId, item.placementSlot)
+    const itemX = bx + bw * placement.anchorX
+    const itemY = by + bh * placement.anchorY
     const dist = Math.hypot(tapX - itemX, tapY - itemY)
-    const radius = Math.max(34, bw * item.scaleRatio * 0.48)
+    const radius = Math.max(34, bw * placement.scaleRatio * 0.48)
 
     if (dist <= radius && dist < closestDist) {
       closestDist = dist
@@ -469,8 +452,8 @@ function ARStatusOverlay({
   selectedItemName: string | null
   isFriendMode: boolean
 }) {
-  const isReady = arState.locked || arState.detected
-  const statusText = arState.locked || arState.detected
+  const isReady = arState.detected
+  const statusText = arState.detected
       ? 'Plant found'
       : 'Find plant'
   const actionText = isFriendMode
@@ -478,8 +461,8 @@ function ARStatusOverlay({
     : deleteMode
       ? 'Tap item to remove'
       : selectedItemName
-        ? `Tap plant or Fit ${selectedItemName}`
-        : 'Find plant, then decorate'
+        ? `Place preset for ${selectedItemName}`
+        : 'Find plant, then choose decor'
 
   return (
     <div

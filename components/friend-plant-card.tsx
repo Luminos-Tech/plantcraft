@@ -31,7 +31,7 @@ export function FriendPlantCard({ friend }: FriendPlantCardProps) {
 
   return (
     <div className="card-hover pixel-shadow group relative overflow-hidden rounded-lg border-2 border-border bg-card/95 p-3 hover:border-primary">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-[linear-gradient(90deg,#8A6FE8,var(--primary),var(--accent))] opacity-70" />
+      <div className="friend-card-divider pointer-events-none absolute inset-x-0 top-0 h-[2px] opacity-70" />
 
       {/* Friend badge */}
       <div className="absolute right-2 top-2.5 flex items-center gap-1 rounded-full bg-[#8A6FE8]/15 px-1.5 py-0.5 font-pixel text-[6px] text-[#8A6FE8]">
@@ -41,7 +41,7 @@ export function FriendPlantCard({ friend }: FriendPlantCardProps) {
 
       <div className="flex items-center gap-3 pt-1">
         {/* Plant icon */}
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-md border border-border bg-[linear-gradient(135deg,var(--secondary),#ffffff)] shadow-sm">
+        <div className="soft-preview-bg flex h-16 w-16 shrink-0 items-center justify-center rounded-md border border-border shadow-sm">
           <span className="text-2xl">🌿</span>
         </div>
 

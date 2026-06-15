@@ -15,7 +15,7 @@ import {
   Sparkles,
   Trophy,
 } from 'lucide-react'
-import { useGameStore } from '@/lib/store'
+import { CARE_ACTION_COOLDOWN_MS, useGameStore } from '@/lib/store'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
@@ -40,7 +40,12 @@ interface MissionTask {
   available: boolean
   href?: string
   actionLabel?: string
-  onAction?: () => void
+  guideSteps?: string[]
+  checklist?: {
+    id: string
+    label: string
+    done: boolean
+  }[]
 }
 
 function getDayWindow(now: number) {
@@ -152,6 +157,45 @@ function MissionCard({
               indicatorClassName={classes.progress}
             />
           </div>
+
+          {task.guideSteps && task.guideSteps.length > 0 && (
+            <div className="mt-3 rounded-md border border-border/70 bg-card/70 p-2.5">
+              <div className="font-pixel text-[7px] text-muted-foreground">Care guide</div>
+              <ol className="mt-2 grid gap-1.5">
+                {task.guideSteps.map((step, index) => (
+                  <li key={`${step}-${index}`} className="flex gap-2 text-xs leading-relaxed text-foreground">
+                    <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm bg-accent/20 font-pixel text-[7px] text-accent">
+                      {index + 1}
+                    </span>
+                    <span className="min-w-0 break-words">{step}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+
+          {task.checklist && task.checklist.length > 0 && (
+            <div className="mt-3 grid gap-1.5">
+              {task.checklist.map((item) => (
+                <div
+                  key={item.id}
+                  className={cn(
+                    'flex items-center gap-2 rounded-md border px-2.5 py-2 text-xs',
+                    item.done
+                      ? 'border-primary/25 bg-primary/10 text-primary'
+                      : 'border-border/70 bg-card/70 text-muted-foreground'
+                  )}
+                >
+                  {item.done ? (
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  ) : (
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full border border-current" aria-hidden="true" />
+                  )}
+                  <span className="min-w-0 flex-1">{item.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -176,16 +220,6 @@ function MissionCard({
               className="h-8 rounded-md border-primary/50 bg-card/85 font-pixel text-[8px]"
             >
               <Link href={task.href}>{task.actionLabel ?? 'Go'}</Link>
-            </Button>
-          )}
-          {!completed && task.onAction && (
-            <Button
-              size="sm"
-              onClick={task.onAction}
-              disabled={!task.available}
-              className="h-8 rounded-md bg-destructive font-pixel text-[8px] text-destructive-foreground hover:bg-destructive/90"
-            >
-              {task.actionLabel ?? 'Treat'}
             </Button>
           )}
           <Button
@@ -225,7 +259,8 @@ export default function MissionPage() {
     coins,
     missionClaims = [],
     claimMissionReward,
-    curePlant,
+    completeRescueMission,
+    getPlantHp,
   } = useGameStore()
 
   useEffect(() => {
@@ -317,31 +352,80 @@ export default function MissionPage() {
   }, [careLogs, cleanTarget, dayWindow.end, dayWindow.key, dayWindow.start, missionClaims, plants, waterProgress, waterTarget])
 
   const emergencyTask = useMemo<MissionTask>(() => {
-    const cureProgress = Math.min(countLogs('cure'), 1)
+    const rescueCompletedToday = careLogs.some(
+      (log) =>
+        log.action === 'cure' &&
+        log.notes === 'Rescue mission completed' &&
+        log.timestamp >= dayWindow.start &&
+        log.timestamp < dayWindow.end
+    )
+
+    if (!firstSickPlant) {
+      return {
+        id: 'emergency-cure',
+        periodKey: dayWindow.key,
+        kicker: 'Emergency',
+        title: 'Plant rescue',
+        meta: rescueCompletedToday ? 'Emergency treatment completed.' : 'No sick plants right now.',
+        icon: <ShieldCheck className="h-5 w-5" aria-hidden="true" />,
+        tone: 'emergency',
+        progress: rescueCompletedToday ? 3 : 0,
+        target: 3,
+        reward: 75,
+        deadlineAt: dayWindow.end,
+        claimed: isClaimed('emergency-cure'),
+        available: rescueCompletedToday,
+      }
+    }
+
+    const diagnosisAt = Math.max(firstSickPlant.pendingDiagnosisAt ?? dayWindow.start, dayWindow.start)
+    const rescueLogs = careLogs.filter(
+      (log) =>
+        log.plantId === firstSickPlant.id &&
+        log.timestamp >= diagnosisAt &&
+        log.timestamp < dayWindow.end
+    )
+    const lastWatered = firstSickPlant.lastWatered || 0
+    const lastWipedAt = firstSickPlant.lastWipedAt || 0
+    const waterDone = getPlantHp(firstSickPlant.id) >= 100 ||
+      rescueLogs.some((log) => log.action === 'water') ||
+      lastWatered >= diagnosisAt ||
+      (lastWatered > 0 && diagnosisAt - lastWatered <= CARE_ACTION_COOLDOWN_MS)
+    const wipeDone = rescueLogs.some((log) => log.action === 'wipe') ||
+      lastWipedAt >= diagnosisAt ||
+      (lastWipedAt > 0 && diagnosisAt - lastWipedAt <= CARE_ACTION_COOLDOWN_MS)
+    const scanDone = rescueLogs.some(
+      (log) => log.action === 'scan' && /healthy|clear/i.test(log.notes ?? '')
+    )
+    const checklist = [
+      { id: 'water', label: `Water ${firstSickPlant.name}`, done: waterDone },
+      { id: 'wipe', label: 'Wipe affected leaves', done: wipeDone },
+      { id: 'scan', label: 'Scan again after care', done: scanDone },
+    ]
+    const firstIncomplete = checklist.find((item) => !item.done)
+    const progress = checklist.filter((item) => item.done).length
+    const guideSteps = firstSickPlant.pendingDiagnosis?.treatments?.slice(0, 4) ?? []
+
     return {
       id: 'emergency-cure',
       periodKey: dayWindow.key,
       kicker: 'Emergency',
       title: 'Plant rescue',
-      meta: firstSickPlant
-        ? `Treat ${firstSickPlant.name}: ${firstSickPlant.pendingDiagnosis?.disease ?? 'disease alert'}`
-        : cureProgress > 0
-          ? 'Emergency treatment completed.'
-          : 'No sick plants right now.',
-      icon: firstSickPlant
-        ? <AlertTriangle className="h-5 w-5" aria-hidden="true" />
-        : <ShieldCheck className="h-5 w-5" aria-hidden="true" />,
+      meta: `${firstSickPlant.name}: ${firstSickPlant.pendingDiagnosis?.disease ?? 'disease alert'}`,
+      icon: <AlertTriangle className="h-5 w-5" aria-hidden="true" />,
       tone: 'emergency',
-      progress: cureProgress,
-      target: 1,
+      progress,
+      target: checklist.length,
       reward: 75,
       deadlineAt: dayWindow.end,
       claimed: isClaimed('emergency-cure'),
-      available: !!firstSickPlant || cureProgress > 0,
-      actionLabel: 'Treat',
-      onAction: firstSickPlant ? () => curePlant(firstSickPlant.id) : undefined,
+      available: true,
+      href: firstIncomplete?.id === 'scan' ? `/camera?plantId=${firstSickPlant.id}` : '/dashboard',
+      actionLabel: firstIncomplete?.id === 'scan' ? 'Scan' : 'Care',
+      guideSteps,
+      checklist,
     }
-  }, [careLogs, curePlant, dayWindow.end, dayWindow.key, dayWindow.start, firstSickPlant, missionClaims])
+  }, [careLogs, dayWindow.end, dayWindow.key, dayWindow.start, firstSickPlant, getPlantHp, missionClaims])
 
   const tasks = [...dailyTasks, emergencyTask]
   const completedCount = tasks.filter((task) => task.progress >= task.target).length
@@ -352,6 +436,10 @@ export default function MissionPage() {
 
   const handleClaim = (task: MissionTask) => {
     if (task.progress < task.target || task.claimed) return
+    if (task.id === 'emergency-cure' && firstSickPlant) {
+      const completed = completeRescueMission(firstSickPlant.id)
+      if (!completed) return
+    }
     claimMissionReward(task.id, task.periodKey, task.reward)
   }
 

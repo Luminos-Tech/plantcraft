@@ -98,7 +98,12 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${pressStart2P.variable} scroll-smooth`} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${inter.variable} ${pressStart2P.variable} scroll-smooth`}
+      data-scroll-behavior="smooth"
+      suppressHydrationWarning
+    >
       <body className="font-sans antialiased" suppressHydrationWarning>
         <Script
           id="extension-attribute-cleanup"

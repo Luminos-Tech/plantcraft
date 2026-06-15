@@ -4,14 +4,14 @@
  * The previous version rendered directly in raw video coordinates while the
  * video element was displayed with object-cover. That made taps and overlays
  * drift on phones. This engine draws in CSS screen pixels, maps detections
- * through the same object-cover transform, and supports a locked plant frame
- * so decorations stay fixed instead of following every noisy detection frame.
+ * through the same object-cover transform. Decorations are rendered from
+ * preset slots on the current detected plant box.
  */
 
-import type { PlacedItem } from '@/lib/store'
+import { dedupePlacedItemsBySlot, getDecorationPlacement, type PlacedItem } from '@/lib/store'
 
 export type BBox = [number, number, number, number]
-export type ARAnchorSource = 'vision' | 'locked' | 'manual'
+export type ARAnchorSource = 'vision'
 
 export interface ARFrameState {
   anchor: BBox | null
@@ -25,10 +25,6 @@ interface Prediction {
   bbox: BBox
   class: string
   score: number
-}
-
-interface StartOptions {
-  autoLock?: boolean
 }
 
 const PLANT_CLASSES = new Set(['potted plant', 'vase', 'bottle', 'cup', 'bowl'])
@@ -56,7 +52,6 @@ export class FilterEngine {
   private model: import('@tensorflow-models/coco-ssd').ObjectDetection | null = null
 
   private suggestedAnchor: BBox | null = null
-  private lockedAnchor: BBox | null = null
   private detectionInFlight = false
   private lastDetectionAt = 0
   private lastDetectionHitAt = -Infinity
@@ -69,7 +64,6 @@ export class FilterEngine {
 
   private getCategoryFn: ((itemId: string) => string) | null = null
   private onStateChange: ((state: ARFrameState) => void) | null = null
-  private options: StartOptions = {}
 
   constructor(video: HTMLVideoElement, canvas: HTMLCanvasElement) {
     this.video = video
@@ -97,12 +91,10 @@ export class FilterEngine {
   start(
     getItems: () => PlacedItem[],
     getCategory: (itemId: string) => string,
-    onStateChange?: (state: ARFrameState) => void,
-    options: StartOptions = {}
+    onStateChange?: (state: ARFrameState) => void
   ): void {
     this.getCategoryFn = getCategory
     this.onStateChange = onStateChange ?? null
-    this.options = options
     this.isRunning = true
 
     const loop = () => {
@@ -130,7 +122,6 @@ export class FilterEngine {
     this.isRunning = false
     cancelAnimationFrame(this.rafId)
     this.suggestedAnchor = null
-    this.lockedAnchor = null
     this.detectionInFlight = false
     this.stableHits = 0
     this.lastStateKey = ''
@@ -143,63 +134,19 @@ export class FilterEngine {
   getState(): ARFrameState {
     const anchor = this.getRenderableAnchor()
     const detected = this.hasFreshDetection()
-    const locked = !!this.lockedAnchor
-    const source: ARAnchorSource | null = locked ? 'locked' : detected && this.suggestedAnchor ? 'vision' : null
+    const source: ARAnchorSource | null = detected && this.suggestedAnchor ? 'vision' : null
 
     return {
       anchor,
       detected,
-      locked,
+      locked: false,
       source,
-      label: locked ? 'Locked' : detected ? 'Tracking' : 'Manual',
+      label: detected ? 'Tracking' : 'Scanning',
     }
   }
 
-  lockAnchor(): ARFrameState {
-    this.lockedAnchor = this.copyBbox(this.suggestedAnchor ?? this.lockedAnchor ?? this.getDefaultAnchor())
-    this.emitState(true)
-    return this.getState()
-  }
-
-  unlockAnchor(): ARFrameState {
-    this.lockedAnchor = null
-    this.emitState(true)
-    return this.getState()
-  }
-
-  resetAnchor(): ARFrameState {
-    this.lockedAnchor = this.getDefaultAnchor()
-    this.suggestedAnchor = this.copyBbox(this.lockedAnchor)
-    this.emitState(true)
-    return this.getState()
-  }
-
-  scaleLockedAnchor(factor: number): ARFrameState {
-    const anchor = this.lockedAnchor ?? this.suggestedAnchor ?? this.getDefaultAnchor()
-    const [x, y, w, h] = anchor
-    const nextW = this.clamp(w * factor, 96, this.getCanvasCssWidth() * 0.96)
-    const nextH = this.clamp(h * factor, 96, this.getCanvasCssHeight() * 0.8)
-    this.lockedAnchor = this.constrainBbox([
-      x + w / 2 - nextW / 2,
-      y + h / 2 - nextH / 2,
-      nextW,
-      nextH,
-    ])
-    this.emitState(true)
-    return this.getState()
-  }
-
-  moveLockedAnchor(dxRatio: number, dyRatio: number): ARFrameState {
-    const anchor = this.lockedAnchor ?? this.suggestedAnchor ?? this.getDefaultAnchor()
-    const dx = this.getCanvasCssWidth() * dxRatio
-    const dy = this.getCanvasCssHeight() * dyRatio
-    this.lockedAnchor = this.constrainBbox([anchor[0] + dx, anchor[1] + dy, anchor[2], anchor[3]])
-    this.emitState(true)
-    return this.getState()
-  }
-
   private maybeDetect(): void {
-    if (!this.model || this.lockedAnchor || this.detectionInFlight) return
+    if (!this.model || this.detectionInFlight) return
     if (this.video.readyState < this.video.HAVE_ENOUGH_DATA) return
 
     const now = performance.now()
@@ -236,9 +183,6 @@ export class FilterEngine {
     this.lastDetectionHitAt = performance.now()
     this.stableHits += 1
 
-    if (this.options.autoLock && this.stableHits >= 3 && !this.lockedAnchor) {
-      this.lockedAnchor = this.copyBbox(this.suggestedAnchor)
-    }
   }
 
   private syncCanvasSize(): void {
@@ -262,22 +206,8 @@ export class FilterEngine {
   }
 
   private getRenderableAnchor(): BBox | null {
-    if (this.lockedAnchor) return this.lockedAnchor
     if (this.suggestedAnchor && this.hasFreshDetection()) return this.suggestedAnchor
     return null
-  }
-
-  private getDefaultAnchor(): BBox {
-    const width = this.getCanvasCssWidth()
-    const height = this.getCanvasCssHeight()
-    const frameWidth = Math.min(width * 0.72, 420)
-    const frameHeight = Math.min(height * 0.46, frameWidth * 1.25)
-    return [
-      (width - frameWidth) / 2,
-      Math.max(92, (height - frameHeight) / 2 - 18),
-      frameWidth,
-      frameHeight,
-    ]
   }
 
   private videoBboxToCanvas([x, y, w, h]: BBox): BBox {
@@ -326,7 +256,7 @@ export class FilterEngine {
   }
 
   private drawItems(anchor: BBox, items: PlacedItem[]): void {
-    const orderedItems = [...items].sort((a, b) => {
+    const orderedItems = dedupePlacedItemsBySlot(items).sort((a, b) => {
       const aCategory = this.getCategoryFn?.(a.itemId) ?? 'block'
       const bCategory = this.getCategoryFn?.(b.itemId) ?? 'block'
       return (LAYER_ORDER[aCategory] ?? 1) - (LAYER_ORDER[bCategory] ?? 1)
@@ -340,12 +270,13 @@ export class FilterEngine {
 
   private drawItem(anchor: BBox, item: PlacedItem, category: string): void {
     const [bx, by, bw, bh] = anchor
+    const placement = getDecorationPlacement(item.itemId, item.placementSlot)
     const baseSize = category === 'vfx'
-      ? Math.max(bw, bh) * item.scaleRatio
-      : bw * item.scaleRatio
+      ? Math.max(bw, bh) * placement.scaleRatio
+      : bw * placement.scaleRatio
     const size = this.clamp(baseSize, category === 'vfx' ? 120 : 30, Math.max(bw, bh) * 1.35)
-    const centerX = bx + bw * item.anchorX
-    const centerY = by + bh * item.anchorY
+    const centerX = bx + bw * placement.anchorX
+    const centerY = by + bh * placement.anchorY
 
     this.ctx.save()
     this.ctx.shadowColor = `${ITEM_COLORS[category] ?? '#5C8A3C'}66`
@@ -568,7 +499,6 @@ export class FilterEngine {
     if (!this.onStateChange) return
     const state = this.getState()
     const key = [
-      state.locked,
       state.detected,
       state.source,
       state.anchor?.map((value) => Math.round(value / 4)).join(',') ?? 'none',
@@ -590,10 +520,6 @@ export class FilterEngine {
 
   private getCanvasCssHeight(): number {
     return this.canvas.clientHeight || this.canvas.height || window.innerHeight
-  }
-
-  private copyBbox(bbox: BBox): BBox {
-    return [...bbox] as BBox
   }
 
   private deadzoneLerp(a: number, b: number, t: number): number {

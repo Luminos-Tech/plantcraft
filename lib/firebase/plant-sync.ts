@@ -3,14 +3,17 @@
  * All functions return null/false gracefully if firebase package is missing.
  */
 
-import type { Plant } from '@/lib/store'
+import { getDecorationPlacement, type DecorationSlot, type PlacedItem, type Plant } from '@/lib/store'
+
+const DECORATION_SLOTS = new Set<DecorationSlot>(['top', 'face', 'base', 'aura'])
 
 export interface SharedPlacedItem {
   id: string
   itemId: string
-  anchorX: number
-  anchorY: number
-  scaleRatio: number
+  placementSlot?: DecorationSlot
+  anchorX?: number
+  anchorY?: number
+  scaleRatio?: number
 }
 
 export interface PublicPlantData {
@@ -35,6 +38,7 @@ export interface OwnedPlantData {
   createdAt: number
   isPublic: boolean
   pendingDiagnosis: Plant['pendingDiagnosis']
+  pendingDiagnosisAt: Plant['pendingDiagnosisAt']
   placedItems: FirebasePlacedItems
   updatedAt: number
 }
@@ -55,6 +59,30 @@ async function getDB() {
   }
 }
 
+function normalizePlacementSlot(value: unknown): DecorationSlot | undefined {
+  return typeof value === 'string' && DECORATION_SLOTS.has(value as DecorationSlot)
+    ? value as DecorationSlot
+    : undefined
+}
+
+function getSharedPlacementSlot(itemId: string, placementSlot: unknown): DecorationSlot {
+  return getDecorationPlacement(itemId, normalizePlacementSlot(placementSlot)).placementSlot
+}
+
+function dedupeSharedItemsBySlot(items: SharedPlacedItem[]): SharedPlacedItem[] {
+  const bySlot = new Map<DecorationSlot, SharedPlacedItem>()
+
+  for (const item of items) {
+    const placementSlot = getSharedPlacementSlot(item.itemId, item.placementSlot)
+    bySlot.set(placementSlot, {
+      ...item,
+      placementSlot,
+    })
+  }
+
+  return [...bySlot.values()]
+}
+
 function normalizePlacedItems(value: unknown): SharedPlacedItem[] {
   if (!value) return []
 
@@ -68,26 +96,24 @@ function normalizePlacedItems(value: unknown): SharedPlacedItem[] {
     if (!item || typeof item !== 'object') return []
 
     const candidate = item as Partial<SharedPlacedItem>
-    if (
-      typeof candidate.id !== 'string' ||
-      typeof candidate.itemId !== 'string' ||
-      typeof candidate.anchorX !== 'number' ||
-      typeof candidate.anchorY !== 'number' ||
-      typeof candidate.scaleRatio !== 'number'
-    ) {
+    if (typeof candidate.id !== 'string' || typeof candidate.itemId !== 'string') {
       return []
     }
+
+    const placementSlot = getSharedPlacementSlot(candidate.itemId, candidate.placementSlot)
 
     return [{
       id: candidate.id,
       itemId: candidate.itemId,
-      anchorX: candidate.anchorX,
-      anchorY: candidate.anchorY,
-      scaleRatio: candidate.scaleRatio,
+      placementSlot,
+      anchorX: typeof candidate.anchorX === 'number' ? candidate.anchorX : undefined,
+      anchorY: typeof candidate.anchorY === 'number' ? candidate.anchorY : undefined,
+      scaleRatio: typeof candidate.scaleRatio === 'number' ? candidate.scaleRatio : undefined,
     }]
   })
 
-  return [...new Map(normalized.map((item) => [item.id, item])).values()]
+  const uniqueById = [...new Map(normalized.map((item) => [item.id, item])).values()]
+  return dedupeSharedItemsBySlot(uniqueById)
 }
 
 function normalizePublicPlantData(value: unknown): PublicPlantData | null {
@@ -108,16 +134,18 @@ function normalizePublicPlantData(value: unknown): PublicPlantData | null {
 }
 
 function serializePlacedItems(plant: Plant, sharedOnly: boolean): FirebasePlacedItems {
-  return Object.fromEntries((plant.placedItems || [])
-    .filter(item => !sharedOnly || plant.isPublic || item.isShared)
-    .map(item => ({
-      id: item.id,
-      itemId: item.itemId,
-      anchorX: item.anchorX,
-      anchorY: item.anchorY,
-      scaleRatio: item.scaleRatio,
-    }))
-    .map((item) => [item.id, item]))
+  const sharedItems = dedupeSharedItemsBySlot(
+    (plant.placedItems || [])
+      .filter(item => !sharedOnly || plant.isPublic || item.isShared)
+      .map(item => ({
+        id: item.id,
+        itemId: item.itemId,
+        placementSlot: getSharedPlacementSlot(item.itemId, item.placementSlot),
+        scaleRatio: item.scaleRatio,
+      }))
+  )
+
+  return Object.fromEntries(sharedItems.map((item) => [item.id, item]))
 }
 
 export async function publishToFirebase(
@@ -168,6 +196,7 @@ export async function publishOwnedPlantToFirebase(
       createdAt: plant.createdAt,
       isPublic: plant.isPublic,
       pendingDiagnosis: plant.pendingDiagnosis ?? null,
+      pendingDiagnosisAt: plant.pendingDiagnosisAt ?? null,
       placedItems: serializePlacedItems(plant, false),
       updatedAt: now,
     }
@@ -214,7 +243,7 @@ export async function unpublishFromFirebase(
 export async function syncPlacedItemToFirebase(
   plantId: string,
   ownerUid: string,
-  item: import('@/lib/store').PlacedItem
+  item: PlacedItem
 ): Promise<void> {
   if (!item.isShared) return
   
@@ -225,8 +254,7 @@ export async function syncPlacedItemToFirebase(
     const sharedItem: SharedPlacedItem = {
       id: item.id,
       itemId: item.itemId,
-      anchorX: item.anchorX,
-      anchorY: item.anchorY,
+      placementSlot: getSharedPlacementSlot(item.itemId, item.placementSlot),
       scaleRatio: item.scaleRatio,
     }
 

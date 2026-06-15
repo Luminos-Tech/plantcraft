@@ -11,12 +11,12 @@ export function AppHeader() {
   const statusLabel = alertCount > 0 ? `${alertCount} alert${alertCount > 1 ? 's' : ''}` : 'Stable'
 
   return (
-    <header className="sticky top-0 z-40 border-b border-primary/20 bg-card/88 px-3 py-2 shadow-sm backdrop-blur-xl sm:px-4">
+    <header className="app-header sticky top-0 z-40 border-b border-primary/20 bg-card/88 px-3 py-2 shadow-sm backdrop-blur-xl sm:px-4">
       <div className="mx-auto w-full max-w-[1180px]">
         <div className="flex items-center justify-between gap-3">
           {/* Logo */}
           <div className="flex min-w-0 items-center gap-2.5">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border-2 border-primary bg-primary text-primary-foreground shadow-sm">
+            <div className="brand-mark flex h-8 w-8 shrink-0 items-center justify-center rounded-md border-2 border-primary bg-primary text-primary-foreground shadow-sm">
               <Leaf className="h-4 w-4" aria-hidden="true" />
             </div>
             <div className="min-w-0">
@@ -59,9 +59,9 @@ export function AppHeader() {
         {/* XP Progress Bar */}
         <div className="mt-2 flex items-center gap-2">
           <span className="hidden font-pixel text-[7px] text-muted-foreground sm:inline">XP</span>
-          <div className="flex-1 overflow-hidden rounded-full border border-border bg-muted">
+          <div className="xp-track flex-1 overflow-hidden rounded-full border border-border bg-muted">
             <div
-              className="h-1.5 rounded-full bg-[linear-gradient(90deg,var(--accent),#6BA6FF,var(--primary))] transition-all duration-500"
+              className="xp-fill h-1.5 rounded-full transition-all duration-500"
               style={{ width: `${xpProgress}%` }}
             />
           </div>

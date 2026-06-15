@@ -1,11 +1,13 @@
 'use client'
 
 import { AlertTriangle, CheckCircle2, HeartPulse, ShieldAlert, Sparkles, X } from 'lucide-react'
-import { DiagnosisResult, useGameStore } from '@/lib/store'
+import { DiagnosisResult } from '@/lib/store'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogTitle,
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
@@ -17,8 +19,6 @@ interface ScanResultModalProps {
 }
 
 export function ScanResultModal({ result, plantId, open, onOpenChange }: ScanResultModalProps) {
-  const { curePlant } = useGameStore()
-
   if (!result) return null
 
   const getSeverityClass = (severity: string) => {
@@ -39,13 +39,6 @@ export function ScanResultModal({ result, plantId, open, onOpenChange }: ScanRes
     }
   }
 
-  const handleCure = () => {
-    if (plantId) {
-      curePlant(plantId)
-    }
-    onOpenChange(false)
-  }
-
   const confidence = Math.max(0, Math.min(100, Math.round(result.confidence * 100)))
   const isHealthy = result.isHealthy
 
@@ -58,6 +51,15 @@ export function ScanResultModal({ result, plantId, open, onOpenChange }: ScanRes
           isHealthy ? 'border-primary/65' : 'border-destructive/65'
         )}
       >
+        <DialogTitle className="sr-only">
+          {isHealthy ? 'Plant scan clear' : 'Plant care alert'}
+        </DialogTitle>
+        <DialogDescription className="sr-only">
+          {isHealthy
+            ? 'The scan did not detect an urgent plant issue.'
+            : 'The scan found a plant care issue and shows treatment steps.'}
+        </DialogDescription>
+
         <div
           className={cn(
             'relative px-4 pb-4 pt-5 text-center',
@@ -158,15 +160,6 @@ export function ScanResultModal({ result, plantId, open, onOpenChange }: ScanRes
         </div>
 
         <div className="grid gap-2 border-t border-border bg-card/95 p-4">
-          {!isHealthy && plantId && (
-            <Button
-              onClick={handleCure}
-              className="h-11 rounded-md bg-accent font-pixel text-[9px] text-accent-foreground hover:bg-accent/90"
-            >
-              <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-              Mark Cured (+100 GC)
-            </Button>
-          )}
           <Button
             onClick={() => onOpenChange(false)}
             variant={isHealthy ? 'default' : 'outline'}

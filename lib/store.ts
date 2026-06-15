@@ -3,23 +3,80 @@ import { persist } from 'zustand/middleware'
 
 // ===== TYPES =====
 
+export type ItemCategory = 'hat' | 'glasses' | 'block' | 'vfx'
+export type DecorationSlot = 'top' | 'face' | 'base' | 'aura'
+
 export interface PlacedItem {
   id: string
   itemId: string
   plantId: string
-  anchorX: number
-  anchorY: number
-  scaleRatio: number
+  placementSlot?: DecorationSlot
+  anchorX?: number // legacy only; new placement uses placementSlot presets
+  anchorY?: number // legacy only; new placement uses placementSlot presets
+  scaleRatio?: number
   isShared: boolean
   placedAt: number
 }
 
-// Default anchor positions for each item category
-export const ITEM_DEFAULT_ANCHOR: Record<string, { anchorX: number; anchorY: number; scaleRatio: number }> = {
-  hat:     { anchorX: 0.5, anchorY: -0.25, scaleRatio: 0.45 },
-  glasses: { anchorX: 0.5, anchorY: 0.25,  scaleRatio: 0.40 },
-  block:   { anchorX: 0.8, anchorY: 0.6,   scaleRatio: 0.30 },
-  vfx:     { anchorX: 0.5, anchorY: 0.5,   scaleRatio: 0.90 },
+export interface DecorationPlacement {
+  placementSlot: DecorationSlot
+  anchorX: number
+  anchorY: number
+  scaleRatio: number
+}
+
+const SLOT_DECORATION_PLACEMENT: Record<DecorationSlot, DecorationPlacement> = {
+  top: { placementSlot: 'top', anchorX: 0.5, anchorY: -0.18, scaleRatio: 0.44 },
+  face: { placementSlot: 'face', anchorX: 0.5, anchorY: 0.28, scaleRatio: 0.4 },
+  base: { placementSlot: 'base', anchorX: 0.78, anchorY: 0.82, scaleRatio: 0.3 },
+  aura: { placementSlot: 'aura', anchorX: 0.5, anchorY: 0.5, scaleRatio: 0.92 },
+}
+
+const CATEGORY_DECORATION_SLOT: Record<ItemCategory, DecorationSlot> = {
+  hat: 'top',
+  glasses: 'face',
+  block: 'base',
+  vfx: 'aura',
+}
+
+const ITEM_DECORATION_OVERRIDES: Record<string, Partial<DecorationPlacement>> = {
+  'hat-crown': { anchorY: -0.22, scaleRatio: 0.42 },
+  'hat-straw': { anchorY: -0.18, scaleRatio: 0.46 },
+  'glasses-heart': { anchorY: 0.3, scaleRatio: 0.44 },
+  'glasses-cool': { anchorY: 0.28, scaleRatio: 0.4 },
+  'block-diamond': { anchorX: 0.82, anchorY: 0.78, scaleRatio: 0.28 },
+  'block-dirt': { anchorX: 0.78, anchorY: 0.84, scaleRatio: 0.32 },
+  'vfx-rainbow': { anchorY: 0.46, scaleRatio: 0.98 },
+  'vfx-sparkle': { anchorY: 0.48, scaleRatio: 0.86 },
+}
+
+function isDecorationSlot(value: unknown): value is DecorationSlot {
+  return typeof value === 'string' && value in SLOT_DECORATION_PLACEMENT
+}
+
+export function getDecorationPlacement(itemId: string, placementSlot?: DecorationSlot | null): DecorationPlacement {
+  const category = SHOP_ITEMS.find((item) => item.id === itemId)?.category ?? 'block'
+  const fallbackSlot = CATEGORY_DECORATION_SLOT[category]
+  const slot = isDecorationSlot(placementSlot) ? placementSlot : fallbackSlot
+  const base = SLOT_DECORATION_PLACEMENT[slot]
+  const override = ITEM_DECORATION_OVERRIDES[itemId] ?? {}
+
+  return {
+    ...base,
+    ...override,
+    placementSlot: override.placementSlot ?? base.placementSlot,
+  }
+}
+
+export function dedupePlacedItemsBySlot<T extends { itemId: string; placementSlot?: DecorationSlot | null }>(items: T[]): T[] {
+  const bySlot = new Map<DecorationSlot, T>()
+
+  for (const item of items) {
+    const slot = getDecorationPlacement(item.itemId, item.placementSlot).placementSlot
+    bySlot.set(slot, item)
+  }
+
+  return [...bySlot.values()]
 }
 
 export interface Plant {
@@ -33,6 +90,7 @@ export interface Plant {
   equippedItems: string[]  // legacy support
   placedItems: PlacedItem[] // new AR filter items
   pendingDiagnosis?: DiagnosisResult | null
+  pendingDiagnosisAt?: number | null
   isPublic: boolean
 }
 
@@ -49,7 +107,7 @@ export interface ShopItem {
   name: string
   description: string
   price: number
-  category: 'hat' | 'glasses' | 'block' | 'vfx'
+  category: ItemCategory
   rarity: 'common' | 'rare' | 'legendary'
   imageUrl: string
   createdAt: Date
@@ -75,7 +133,7 @@ export interface FriendPlant {
   name: string
   description: string
   hp: number
-  placedItems: Pick<PlacedItem, "id" | "itemId" | "anchorX" | "anchorY" | "scaleRatio">[]
+  placedItems: Pick<PlacedItem, 'id' | 'itemId' | 'placementSlot' | 'anchorX' | 'anchorY' | 'scaleRatio'>[]
   lastUpdated: number
   addedAt: number          // when we saved this friend plant
 }
@@ -137,6 +195,7 @@ interface GameState {
   waterPlant: (plantId: string) => boolean
   wipePlant: (plantId: string) => boolean
   curePlant: (plantId: string) => boolean
+  completeRescueMission: (plantId: string) => boolean
   setPendingDiagnosis: (plantId: string, diagnosis: DiagnosisResult) => void
   setPlantPublic: (plantId: string, isPublic: boolean) => void
   updateAllHP: () => void
@@ -225,6 +284,24 @@ function syncOwnedPlantRecord(plant: Plant, hp: number) {
   })
 }
 
+function syncPublicPlantRecord(plant: Plant, hp: number) {
+  const ownerUid = getOrCreateOwnerUid()
+  if (!ownerUid) return
+
+  import('@/lib/firebase/plant-sync').then(({ publishToFirebase }) => {
+    publishToFirebase(plant, ownerUid, hp).catch(console.warn)
+  })
+}
+
+function unpublishPublicPlantRecord(plantId: string) {
+  const ownerUid = getOrCreateOwnerUid()
+  if (!ownerUid) return
+
+  import('@/lib/firebase/plant-sync').then(({ unpublishFromFirebase }) => {
+    unpublishFromFirebase(plantId, ownerUid).catch(console.warn)
+  })
+}
+
 function removePlantRecords(plant: Plant) {
   const ownerUid = getOrCreateOwnerUid()
   if (!ownerUid) return
@@ -275,6 +352,7 @@ export const useGameStore = create<GameState>()(
           equippedItems: [],
           placedItems: [],
           pendingDiagnosis: null,
+          pendingDiagnosisAt: null,
           isPublic: false,
         }
         const rewards = REWARD_TABLE.add_plant
@@ -318,6 +396,7 @@ export const useGameStore = create<GameState>()(
 
         const updatedPlant = get().plants.find((plant) => plant.id === plantId)
         if (updatedPlant) syncOwnedPlantRecord(updatedPlant, get().getPlantHp(plantId))
+        if (updatedPlant?.isPublic) syncPublicPlantRecord(updatedPlant, get().getPlantHp(plantId))
       },
       
       removePlant: (plantId) => {
@@ -415,7 +494,7 @@ export const useGameStore = create<GameState>()(
           const progress = applyXpProgress(state.level, state.xp, rewards.xp)
           return {
             plants: state.plants.map((p) =>
-              p.id === plantId ? { ...p, pendingDiagnosis: null, lastWatered: now } : p
+              p.id === plantId ? { ...p, pendingDiagnosis: null, pendingDiagnosisAt: null, lastWatered: now } : p
             ),
             coins: state.coins + rewards.coins,
             ...progress,
@@ -441,14 +520,34 @@ export const useGameStore = create<GameState>()(
         return true
       },
 
-      setPendingDiagnosis: (plantId, diagnosis) => {
+      completeRescueMission: (plantId) => {
+        const plant = get().plants.find((p) => p.id === plantId)
+        if (!plant?.pendingDiagnosis) return false
+
         set((state) => ({
           plants: state.plants.map((p) =>
-            p.id === plantId ? { ...p, pendingDiagnosis: diagnosis } : p
+            p.id === plantId ? { ...p, pendingDiagnosis: null, pendingDiagnosisAt: null } : p
+          ),
+        }))
+        get().addCareLog(plantId, 'cure', 'Rescue mission completed')
+        const updatedPlant = get().plants.find((p) => p.id === plantId)
+        const updatedHp = get().getPlantHp(plantId)
+        if (updatedPlant) syncOwnedPlantRecord(updatedPlant, updatedHp)
+        if (plant.isPublic) syncPublicPlantHp(plantId, updatedHp)
+        return true
+      },
+
+      setPendingDiagnosis: (plantId, diagnosis) => {
+        const now = Date.now()
+        set((state) => ({
+          plants: state.plants.map((p) =>
+            p.id === plantId ? { ...p, pendingDiagnosis: diagnosis, pendingDiagnosisAt: now } : p
           ),
         }))
         const updatedPlant = get().plants.find((p) => p.id === plantId)
-        if (updatedPlant) syncOwnedPlantRecord(updatedPlant, get().getPlantHp(plantId))
+        const updatedHp = get().getPlantHp(plantId)
+        if (updatedPlant) syncOwnedPlantRecord(updatedPlant, updatedHp)
+        if (updatedPlant?.isPublic) syncPublicPlantRecord(updatedPlant, updatedHp)
       },
 
       setPlantPublic: (plantId, isPublic) => {
@@ -467,7 +566,13 @@ export const useGameStore = create<GameState>()(
           ),
         }))
         const updatedPlant = get().plants.find((p) => p.id === plantId)
-        if (updatedPlant) syncOwnedPlantRecord(updatedPlant, get().getPlantHp(plantId))
+        const updatedHp = get().getPlantHp(plantId)
+        if (updatedPlant) syncOwnedPlantRecord(updatedPlant, updatedHp)
+        if (updatedPlant && isPublic) {
+          syncPublicPlantRecord(updatedPlant, updatedHp)
+        } else {
+          unpublishPublicPlantRecord(plantId)
+        }
       },
 
       updateAllHP: () => {
@@ -532,22 +637,36 @@ export const useGameStore = create<GameState>()(
 
       savePlacedItem: (plantId, item) => {
         const plant = get().plants.find((p) => p.id === plantId)
+        const placement = getDecorationPlacement(item.itemId, item.placementSlot)
         const itemToSave = {
           ...item,
+          placementSlot: placement.placementSlot,
+          scaleRatio: placement.scaleRatio,
           isShared: item.isShared || plant?.isPublic || false,
         }
 
         set((state) => ({
           plants: state.plants.map((p) =>
             p.id === plantId
-              ? { ...p, placedItems: [...(p.placedItems || []), itemToSave] }
+              ? {
+                  ...p,
+                  placedItems: [
+                    ...(p.placedItems || []).filter((placedItem) => {
+                      const placedSlot = getDecorationPlacement(placedItem.itemId, placedItem.placementSlot).placementSlot
+                      return placedSlot !== placement.placementSlot
+                    }),
+                    itemToSave,
+                  ],
+                }
               : p
           ),
         }))
         const updatedPlant = get().plants.find((p) => p.id === plantId)
         if (updatedPlant) syncOwnedPlantRecord(updatedPlant, get().getPlantHp(plantId))
-        
-        if (itemToSave.isShared && typeof window !== 'undefined') {
+
+        if (updatedPlant?.isPublic) {
+          syncPublicPlantRecord(updatedPlant, get().getPlantHp(plantId))
+        } else if (itemToSave.isShared && typeof window !== 'undefined') {
           const ownerUid = localStorage.getItem('plantcraft_uid')
           if (ownerUid) {
             import('@/lib/firebase/plant-sync').then(({ syncPlacedItemToFirebase }) => {
@@ -569,13 +688,10 @@ export const useGameStore = create<GameState>()(
         const updatedPlant = get().plants.find((p) => p.id === plantId)
         if (updatedPlant) syncOwnedPlantRecord(updatedPlant, get().getPlantHp(plantId))
 
-        if (plant?.isPublic && typeof window !== 'undefined') {
-          const ownerUid = localStorage.getItem('plantcraft_uid')
-          if (ownerUid) {
-            import('@/lib/firebase/plant-sync').then(({ removeSharedItemFromFirebase }) => {
-              removeSharedItemFromFirebase(plantId, ownerUid, itemInstanceId).catch(console.warn)
-            })
-          }
+        if (updatedPlant?.isPublic) {
+          syncPublicPlantRecord(updatedPlant, get().getPlantHp(plantId))
+        } else if (plant?.isPublic) {
+          unpublishPublicPlantRecord(plantId)
         }
       },
       
