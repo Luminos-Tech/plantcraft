@@ -2,10 +2,12 @@
  * App version — update this after each fix or feature change.
  * Format: major.minor.patch
  */
-export const APP_VERSION = '1.7.4'
+export const APP_VERSION = '1.7.5'
 
 /**
  * Changelog (latest first):
+ * 1.7.5 - Move the app header below iPhone safe areas and replace the
+ *         Add to Home Screen icon with a plant-focused app icon
  * 1.7.4 - Capture plant photos with the visible AR overlay and add iOS/PWA
  *         install support for Safari Add to Home Screen
  * 1.7.3 - Restore the fixed PlantCraft leaf logo and make AR Photo update
